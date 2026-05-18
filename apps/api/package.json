@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@evidence/core": "workspace:*",
+    "@evidence/storage": "workspace:*",
+    "@evidence/tsa": "workspace:*",
     "@fastify/sensible": "^6.0.2",
     "drizzle-orm": "^0.38.2",
     "fastify": "^5.2.0",

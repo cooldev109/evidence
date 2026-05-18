@@ -7,10 +7,14 @@ import { registerEventRoutes } from './http/event-routes.js';
 import { registerWebhookRoutes } from './http/webhook-routes.js';
 import { registerVerifyRoutes } from './http/verify-routes.js';
 import { registerHealthRoutes } from './http/health-routes.js';
+import { registerEvidenceRoutes } from './http/evidence-routes.js';
+import { buildStore, buildTSARegistry } from './evidence/bootstrap.js';
+import { EvidencePersistenceService } from './evidence/persistence-service.js';
 
 export interface AppDeps {
   config: AppConfig;
   sql: PgClient;
+  persistence: EvidencePersistenceService;
 }
 
 export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
@@ -26,6 +30,7 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   await registerEventRoutes(app, deps);
   await registerWebhookRoutes(app, deps);
   await registerVerifyRoutes(app, deps);
+  await registerEvidenceRoutes(app, deps);
 
   return app;
 }
@@ -33,7 +38,10 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
 async function main(): Promise<void> {
   const config = loadConfig();
   const { sql } = createDb({ url: config.DATABASE_URL });
-  const app = await buildServer({ config, sql });
+  const store = buildStore(config);
+  const tsaRegistry = buildTSARegistry(config);
+  const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry });
+  const app = await buildServer({ config, sql, persistence });
   try {
     await app.listen({ host: config.API_HOST, port: config.API_PORT });
   } catch (err) {

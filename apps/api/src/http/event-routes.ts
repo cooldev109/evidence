@@ -8,6 +8,11 @@ import {
   listEvents,
   IdempotencyConflict,
 } from '../events/repository.js';
+import { computeRetainUntil } from '../evidence/bootstrap.js';
+
+function computeRetainUntilForConfig(years: number): string {
+  return computeRetainUntil(years);
+}
 
 const PostEventBody = z.object({
   source: z.string().min(1).max(128),
@@ -42,8 +47,20 @@ export async function registerEventRoutes(app: FastifyInstance, deps: AppDeps): 
         externalId: body.data.externalId ?? null,
         payload: body.data.payload,
       });
+      const persisted = await deps.persistence.persist({
+        tenantId: tenant.id,
+        tenantLocale: tenant.locale,
+        event,
+        payload: body.data.payload,
+        retainMode: deps.config.RETAIN_MODE,
+        retainUntilIso:
+          deps.config.RETAIN_MODE === 'none'
+            ? null
+            : computeRetainUntilForConfig(deps.config.RETAIN_YEARS),
+        kmsKeyId: deps.config.STORAGE_KMS_KEY_ID,
+      });
       reply.status(201);
-      return { event };
+      return { event, evidence: persisted };
     } catch (err) {
       if (err instanceof IdempotencyConflict) {
         reply.status(200);
