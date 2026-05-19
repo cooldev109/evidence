@@ -5,10 +5,11 @@ coverage
 .DS_Store
 *.log
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 .vscode/
 .idea/
 *.tsbuildinfo
 .pnpm-store/
 .turbo/
+.evidence-store/

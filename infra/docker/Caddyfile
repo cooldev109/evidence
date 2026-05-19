@@ -1,0 +1,28 @@
+# EVIDENCE — Caddy reverse proxy
+#
+# Behavior:
+#   - If DOMAIN is a real domain (e.g. api.empresa.com.br), Caddy auto-fetches
+#     a Let's Encrypt certificate and serves HTTPS.
+#   - If DOMAIN is left as ":80" (the docker-compose default), Caddy serves
+#     plain HTTP on port 80 — useful while you're testing against the raw IP
+#     before a domain is provisioned.
+
+{$DOMAIN} {
+    reverse_proxy api:3000
+
+    encode gzip zstd
+
+    log {
+        output stdout
+        format console
+    }
+
+    header {
+        # Basic security headers; safe defaults
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        # HSTS only meaningful once HTTPS is on a real domain
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+}

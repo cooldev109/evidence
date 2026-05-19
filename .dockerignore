@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+.git
+.github
+.vscode
+.idea
+docs
+*.log
+.env
+.env.*
+.evidence-store
+**/*.test.ts
