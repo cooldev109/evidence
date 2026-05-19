@@ -1,0 +1,298 @@
+{
+  "info": {
+    "name": "EVIDENCE — Milestone 1",
+    "_postman_id": "9f3c1c7c-evdm1-collection",
+    "description": "Test collection for EVIDENCE Milestone 1 (Event Capture & Hash Chaining). Set the `api_key` collection variable to your seeded API key (starts with evk_).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "api_key", "value": "evk_paste_your_key_here" },
+    { "key": "webhook_secret", "value": "change-me-in-prod" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{api_key}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "0 — Health (no auth)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "1 — POST event #1 (genesis)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"app\",\n  \"payload\": { \"action\": \"login\", \"user\": \"henry\" }\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/events", "host": ["{{baseUrl}}"], "path": ["v1","events"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 201', () => pm.response.to.have.status(201));",
+              "pm.test('seq=1', () => pm.expect(json.event.seq).to.eql(1));",
+              "pm.test('prevHash is 64 zeros', () => pm.expect(json.event.prevHash).to.eql('0'.repeat(64)));",
+              "pm.collectionVariables.set('event1_id', json.event.id);",
+              "pm.collectionVariables.set('chain_hash_1', json.event.chainHash);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 — POST event #2 (chain linkage)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"app\",\n  \"payload\": { \"action\": \"logout\", \"user\": \"henry\" }\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/events", "host": ["{{baseUrl}}"], "path": ["v1","events"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 201', () => pm.response.to.have.status(201));",
+              "pm.test('seq=2', () => pm.expect(json.event.seq).to.eql(2));",
+              "pm.test('prevHash == event1.chainHash (linkage)', () =>",
+              "  pm.expect(json.event.prevHash).to.eql(pm.collectionVariables.get('chain_hash_1'))",
+              ");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 — GET event by id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/events/{{event1_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","events","{{event1_id}}"]
+        }
+      }
+    },
+    {
+      "name": "4 — GET event 404 (unknown id)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/events/00000000-0000-0000-0000-000000000000",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","events","00000000-0000-0000-0000-000000000000"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 — GET /v1/events (paginated)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/events?limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","events"],
+          "query": [{ "key": "limit", "value": "10" }]
+        }
+      }
+    },
+    {
+      "name": "6 — GET /v1/chain?fromSeq=1&toSeq=2",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/chain?fromSeq=1&toSeq=2",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","chain"],
+          "query": [
+            { "key": "fromSeq", "value": "1" },
+            { "key": "toSeq", "value": "2" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "7 — GET /v1/verify (clean chain)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/v1/verify", "host": ["{{baseUrl}}"], "path": ["v1","verify"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('verify ok', () => pm.expect(json.result.ok).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 — POST idempotent (externalId)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"stripe\",\n  \"externalId\": \"evt_demo_1\",\n  \"payload\": { \"amount\": 1000 }\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/events", "host": ["{{baseUrl}}"], "path": ["v1","events"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "if (pm.response.code === 200) {",
+              "  pm.test('idempotent flag returned', () => pm.expect(json.idempotent).to.eql(true));",
+              "} else {",
+              "  pm.test('first send 201', () => pm.response.to.have.status(201));",
+              "}",
+              "// Run this request twice in a row: first 201, second 200 with idempotent=true."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 — POST /v1/webhooks/stripe (HMAC signed, pre-request)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-evidence-signature", "value": "{{computed_sig}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"externalId\":\"wh_demo_1\",\"payload\":{\"foo\":\"bar\"}}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/webhooks/stripe",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","webhooks","stripe"]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Compute HMAC-SHA256(webhook_secret, raw body) so the server accepts the request.",
+              "const body = pm.request.body.raw;",
+              "const secret = pm.collectionVariables.get('webhook_secret');",
+              "const sig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+              "pm.collectionVariables.set('computed_sig', sig);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 — Webhook with BAD signature → 401",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-evidence-signature", "value": "deadbeef" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"externalId\":\"wh_demo_bad\",\"payload\":{\"foo\":\"bar\"}}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/webhooks/stripe",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","webhooks","stripe"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('rejects bad signature', () => pm.response.to.have.status(401));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 — Auth: missing key → 401",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"source\":\"x\",\"payload\":{}}" },
+        "url": { "raw": "{{baseUrl}}/v1/events", "host": ["{{baseUrl}}"], "path": ["v1","events"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('401 unauthorized', () => pm.response.to.have.status(401));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 — Auth: bad key → 401",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "evk_bogus_invalid_key", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"source\":\"x\",\"payload\":{}}" },
+        "url": { "raw": "{{baseUrl}}/v1/events", "host": ["{{baseUrl}}"], "path": ["v1","events"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('401 unauthorized', () => pm.response.to.have.status(401));"]
+          }
+        }
+      ]
+    }
+  ]
+}
