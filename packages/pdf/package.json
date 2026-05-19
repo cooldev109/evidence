@@ -1,0 +1,25 @@
+{
+  "name": "@evidence/pdf",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@evidence/core": "workspace:*",
+    "pdfkit": "^0.15.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.13.5",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

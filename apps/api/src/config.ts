@@ -24,6 +24,13 @@ const EnvSchema = z.object({
   TSA_BR_PROVIDER: z.enum(['mock', 'freetsa', 'icp-brasil']).default('mock'),
   TSA_EU_PROVIDER: z.enum(['mock', 'freetsa', 'eidas']).default('mock'),
   TSA_US_PROVIDER: z.enum(['mock', 'freetsa', 'us-digicert']).default('mock'),
+
+  // Public site (used by the PDF report's QR code + verification page)
+  PUBLIC_BASE_URL: z.string().default('http://docas.ai'),
+
+  // Rate limit for public (no-auth) endpoints
+  PUBLIC_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(60),
+  PUBLIC_RATE_LIMIT_WINDOW: z.string().default('1 minute'),
 });
 
 export type AppConfig = z.infer<typeof EnvSchema>;
