@@ -9,12 +9,16 @@ RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
 WORKDIR /app
 
 # ---- dependencies (cached when lockfile + package.json files don't change) ----
+# Copy every workspace manifest so pnpm installs deps for ALL packages.
+# Adding a new package means adding its package.json line here.
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/core/package.json ./packages/core/
 COPY packages/tsa/package.json ./packages/tsa/
 COPY packages/storage/package.json ./packages/storage/
+COPY packages/pdf/package.json ./packages/pdf/
+COPY packages/verify/package.json ./packages/verify/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
@@ -22,15 +26,11 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM base AS runtime
 ENV NODE_ENV=production
 
-# Copy workspace symlinks + per-package node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
-COPY --from=deps /app/packages/tsa/node_modules ./packages/tsa/node_modules
-COPY --from=deps /app/packages/storage/node_modules ./packages/storage/node_modules
-
-# Copy source
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Bring over the entire installed tree (root + every workspace package's
+# node_modules + pnpm symlinks) in one shot, then overlay the source. This is
+# robust to new packages: a new workspace package's node_modules comes along
+# automatically without editing a per-package COPY list.
+COPY --from=deps /app ./
 COPY apps ./apps
 COPY packages ./packages
 
