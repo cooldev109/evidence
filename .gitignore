@@ -13,3 +13,6 @@ coverage
 .pnpm-store/
 .turbo/
 .evidence-store/
+# TLS material — never commit certs/keys; keep the dir via .gitkeep
+infra/docker/certs/*
+!infra/docker/certs/.gitkeep

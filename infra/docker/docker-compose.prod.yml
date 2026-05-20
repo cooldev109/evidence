@@ -74,7 +74,12 @@ services:
     environment:
       DOMAIN: ${DOMAIN:-:80}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # CADDYFILE selects plain-HTTP (./Caddyfile, default) or TLS-with-origin-cert
+      # (./Caddyfile.tls) without editing the compose file.
+      - ${CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      # CERTS_DIR holds origin.crt + origin.key for the TLS Caddyfile. Defaults
+      # to the (empty) ./certs dir so the mount is valid even in plain-HTTP mode.
+      - ${CERTS_DIR:-./certs}:/certs:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

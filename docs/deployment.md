@@ -165,17 +165,67 @@ If you see that, deployment is live.
 
 ---
 
-## 7. Enable HTTPS once a domain is pointed here
+## 7. Enable HTTPS
 
-When the client registers a domain and adds an `A` record pointing it at `177.7.51.251`:
+There are two scenarios depending on whether the domain is proxied by Cloudflare.
+
+### 7a. Direct DNS (no Cloudflare proxy) — Let's Encrypt
+
+If an `A` record points the domain straight at the VPS (DNS-only / "grey cloud"), Caddy can get a real Let's Encrypt cert automatically:
 
 ```bash
 cd /opt/evidence
-sed -i 's/^DOMAIN=.*/DOMAIN=api.empresa.com.br/' .env   # adjust to the real domain
+sed -i 's/^DOMAIN=.*/DOMAIN=api.empresa.com.br/' .env
 docker compose -f infra/docker/docker-compose.prod.yml --env-file .env up -d
 ```
 
-Caddy auto-provisions a Let's Encrypt certificate on the first inbound request. HTTPS is live within ~30 seconds. No re-build, no downtime beyond the Caddy restart.
+Caddy auto-provisions the cert on the first inbound request (HTTP-01 challenge over port 80). HTTPS is live within ~30 seconds.
+
+### 7b. Behind Cloudflare proxy ("orange cloud") — Origin Certificate + Full (strict)
+
+This is the production setup for `docas.ai`. Let's Encrypt's HTTP-01 challenge cannot complete through the Cloudflare proxy, so instead the origin serves a **Cloudflare Origin Certificate** (free, 15-year, trusted only between Cloudflare and this server), and Cloudflare runs in **Full (strict)** mode for end-to-end encryption.
+
+**Step 1 — Client generates the Origin Certificate (Cloudflare dashboard).**
+SSL/TLS → Origin Server → Create Certificate → accept defaults (RSA, hostnames `docas.ai` and `*.docas.ai`, 15 years). Cloudflare shows two text blocks:
+- Origin Certificate (begins `-----BEGIN CERTIFICATE-----`)
+- Private Key (begins `-----BEGIN PRIVATE KEY-----`)
+
+**Step 2 — Install the cert on the VPS.**
+```bash
+mkdir -p /opt/evidence/certs
+# Paste the Origin Certificate:
+nano /opt/evidence/certs/origin.crt       # paste the certificate block, save
+# Paste the Private Key:
+nano /opt/evidence/certs/origin.key       # paste the private key block, save
+chmod 600 /opt/evidence/certs/origin.key
+```
+
+**Step 3 — Point the stack at the TLS Caddyfile + certs.**
+```bash
+cd /opt/evidence
+sed -i 's/^DOMAIN=.*/DOMAIN=docas.ai/' .env
+# Append the TLS settings if not already present:
+grep -q '^CADDYFILE=' .env || echo 'CADDYFILE=./Caddyfile.tls' >> .env
+grep -q '^CERTS_DIR=' .env || echo 'CERTS_DIR=/opt/evidence/certs' >> .env
+docker compose -f infra/docker/docker-compose.prod.yml --env-file .env up -d --force-recreate
+```
+
+**Step 4 — Set Cloudflare to Full (strict).**
+SSL/TLS → Overview → encryption mode → **Full (strict)**.
+
+**Step 5 — Verify.**
+```bash
+# Origin now serves HTTPS with the origin cert:
+curl -k https://localhost/health           # on the VPS → {"status":"ok","db":"ok"}
+# End-to-end through Cloudflare:
+curl https://docas.ai/health               # from anywhere → 200
+```
+
+> `CERTS_DIR` is an absolute path on the VPS (`/opt/evidence/certs`). The cert + key are never committed to git (`.gitignore` excludes `infra/docker/certs/*`). To rotate, replace the two files and `docker compose ... up -d --force-recreate`.
+
+### Quick demo alternative — Cloudflare "Flexible"
+
+If you just need HTTPS working for a demo and don't want to install a cert yet, leave the origin on plain HTTP (`DOMAIN=:80`, default Caddyfile) and set Cloudflare SSL/TLS mode to **Flexible**. Browser↔Cloudflare is HTTPS; Cloudflare↔origin is HTTP. Acceptable for demos, not for production legal-evidence traffic — move to 7b before go-live.
 
 ---
 

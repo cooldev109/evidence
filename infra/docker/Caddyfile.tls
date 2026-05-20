@@ -1,0 +1,33 @@
+# EVIDENCE — Caddy reverse proxy with an explicit TLS certificate.
+#
+# Use this Caddyfile for production behind Cloudflare in "Full (strict)" mode.
+# Caddy serves HTTPS on 443 using a Cloudflare Origin Certificate mounted at
+# /certs (NOT Let's Encrypt — LE cannot validate through the Cloudflare proxy).
+#
+# Activate by setting in .env:
+#   DOMAIN=docas.ai
+#   CADDYFILE=./Caddyfile.tls
+#   CERTS_DIR=/opt/evidence/certs        # holds origin.crt + origin.key
+#
+# The Origin Certificate is trusted only between Cloudflare and this server,
+# which is exactly what "Full (strict)" validates.
+
+{$DOMAIN} {
+    tls /certs/origin.crt /certs/origin.key
+
+    reverse_proxy api:3000
+
+    encode gzip zstd
+
+    log {
+        output stdout
+        format console
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+}
