@@ -206,3 +206,29 @@ export async function fetchChainRange(
     return rows.map(rowToEvent);
   });
 }
+
+export interface VerificationRecord extends AppendedEvent {
+  payload: unknown;
+}
+
+/**
+ * Like fetchChainRange but also returns the raw payload, so the verifier can
+ * recompute the payload hash and detect direct tampering of the stored
+ * payload (not just chain-structure tampering).
+ */
+export async function fetchChainForVerification(
+  sql: PgClient,
+  opts: FetchChainRangeOptions,
+): Promise<VerificationRecord[]> {
+  const from = opts.fromSeq ?? 1;
+  const to = opts.toSeq ?? Number.MAX_SAFE_INTEGER;
+  return withTenant(sql, opts.tenantId, async (tx) => {
+    const rows = await tx<(EventRow & { payload: unknown })[]>`
+      SELECT * FROM events
+      WHERE tenant_id = ${opts.tenantId}
+        AND seq >= ${from} AND seq <= ${to}
+      ORDER BY seq ASC
+    `;
+    return rows.map((row) => ({ ...rowToEvent(row), payload: row.payload }));
+  });
+}

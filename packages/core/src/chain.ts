@@ -1,4 +1,4 @@
-import { GENESIS_PREV_HASH, sha256Hex } from './hash.js';
+import { GENESIS_PREV_HASH, hashPayload, sha256Hex } from './hash.js';
 
 export interface ChainLinkInput {
   seq: number;
@@ -26,12 +26,24 @@ export interface ChainRecord {
   prevHash: string;
   chainHash: string;
   createdAt: string;
+  /**
+   * The original event payload. Optional: when provided, verifyChain also
+   * confirms that hashPayload(payload) === payloadHash, which catches direct
+   * tampering of the stored payload even when payload_hash was left intact.
+   * Omit it (e.g. when only the hashes are available) to skip that check.
+   */
+  payload?: unknown;
 }
 
 export type ChainVerificationOk = { ok: true; verified: number };
 export type ChainVerificationErr = {
   ok: false;
-  reason: 'genesis-mismatch' | 'sequence-gap' | 'tenant-mismatch' | 'hash-mismatch';
+  reason:
+    | 'genesis-mismatch'
+    | 'sequence-gap'
+    | 'tenant-mismatch'
+    | 'hash-mismatch'
+    | 'payload-hash-mismatch';
   atSeq: number;
   detail: string;
 };
@@ -80,6 +92,20 @@ export function verifyChain(
         atSeq: rec.seq,
         detail: `Record seq=${rec.seq} prevHash=${rec.prevHash} does not match previous chainHash=${prevHash}`,
       };
+    }
+    // If the raw payload is available, confirm it still hashes to the committed
+    // payloadHash. This catches tampering of the stored payload that left
+    // payload_hash untouched (the chain-hash check below trusts payloadHash).
+    if (rec.payload !== undefined) {
+      const recomputed = hashPayload(rec.payload);
+      if (recomputed !== rec.payloadHash) {
+        return {
+          ok: false,
+          reason: 'payload-hash-mismatch',
+          atSeq: rec.seq,
+          detail: `Record seq=${rec.seq} payload no longer matches payloadHash (recomputed=${recomputed}, stored=${rec.payloadHash})`,
+        };
+      }
     }
     const expectedHash = computeChainHash({
       seq: rec.seq,

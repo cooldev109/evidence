@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { verifyChain } from '@evidence/core';
 import type { AppDeps } from '../server.js';
-import { fetchChainRange } from '../events/repository.js';
+import { fetchChainForVerification } from '../events/repository.js';
 
 const VerifyQuery = z.object({
   fromSeq: z.coerce.number().int().min(1).optional(),
@@ -20,7 +20,7 @@ export async function registerVerifyRoutes(
       return { error: 'invalid_query', detail: q.error.flatten() };
     }
     const tenant = req.tenant!;
-    const events = await fetchChainRange(deps.sql, {
+    const events = await fetchChainForVerification(deps.sql, {
       tenantId: tenant.id,
       fromSeq: q.data.fromSeq,
       toSeq: q.data.toSeq,
@@ -33,6 +33,7 @@ export async function registerVerifyRoutes(
         prevHash: e.prevHash,
         chainHash: e.chainHash,
         createdAt: e.createdAt,
+        payload: e.payload,
       })),
       tenant.id,
     );

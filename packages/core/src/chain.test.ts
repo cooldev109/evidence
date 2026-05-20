@@ -75,6 +75,29 @@ describe('verifyChain', () => {
     }
   });
 
+  it('detects payload tampering when payload is provided and no longer matches payloadHash', () => {
+    const chain = buildChain([{ a: 1 }, { b: 2 }]);
+    // Attach the original payloads, then tamper the first payload only,
+    // leaving payloadHash + chainHash untouched (the DB-level attack).
+    const withPayloads = chain.map((rec, i) => ({
+      ...rec,
+      payload: i === 0 ? { a: 999 } : { b: 2 },
+    }));
+    const result = verifyChain(withPayloads, T);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('payload-hash-mismatch');
+      expect(result.atSeq).toBe(1);
+    }
+  });
+
+  it('passes when payloads are provided and match', () => {
+    const payloads = [{ a: 1 }, { b: 2 }, { c: 3 }];
+    const chain = buildChain(payloads);
+    const withPayloads = chain.map((rec, i) => ({ ...rec, payload: payloads[i] }));
+    expect(verifyChain(withPayloads, T)).toEqual({ ok: true, verified: 3 });
+  });
+
   it('detects a genesis-mismatch when starting at seq=1 without zero prev', () => {
     const chain = buildChain([{ a: 1 }]);
     chain[0] = { ...chain[0], prevHash: 'a'.repeat(64) };

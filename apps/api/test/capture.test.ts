@@ -130,27 +130,40 @@ describe('GET /v1/verify', () => {
     expect(res.result.verified).toBe(5);
   });
 
-  it('detects tampering when an event payload is mutated in the DB', async () => {
-    const { key, tenantId } = await seedTenant('tamper');
+  it('detects payload-only tampering (payload changed, payload_hash left intact)', async () => {
+    // This is the DB-level attack: edit the stored payload but leave
+    // payload_hash (and therefore chain_hash) untouched. The verifier must
+    // re-hash the payload and catch it.
+    const { key, tenantId } = await seedTenant('tamper-payload');
     for (let i = 0; i < 3; i++) {
       await post('/v1/events', key, { source: 'x', payload: { i } });
     }
-    // Mutate the payload of the 2nd event directly
     await ctx.sql.unsafe(`
       UPDATE events
       SET payload = '{"i":999}'::jsonb
       WHERE tenant_id = '${tenantId}' AND seq = 2
     `);
-    // Recompute payload_hash to simulate a more sophisticated tamper that also
-    // updates payload_hash but leaves chain_hash unchanged: chain should still detect.
+    const res = (await get('/v1/verify', key)).json();
+    expect(res.result.ok).toBe(false);
+    expect(res.result.reason).toBe('payload-hash-mismatch');
+    expect(res.result.atSeq).toBe(2);
+  });
+
+  it('detects chain-structure tampering (payload + payload_hash changed)', async () => {
+    const { key, tenantId } = await seedTenant('tamper-chain');
+    for (let i = 0; i < 3; i++) {
+      await post('/v1/events', key, { source: 'x', payload: { i } });
+    }
     await ctx.sql.unsafe(`
       UPDATE events
-      SET payload_hash = encode(sha256('{"i":999}'::bytea), 'hex')
+      SET payload = '{"i":999}'::jsonb,
+          payload_hash = encode(sha256('{"i":999}'::bytea), 'hex')
       WHERE tenant_id = '${tenantId}' AND seq = 2
     `);
     const res = (await get('/v1/verify', key)).json();
     expect(res.result.ok).toBe(false);
-    expect(res.result.reason).toBe('hash-mismatch');
+    // payload-hash check runs first now; either way tampering is caught at seq=2.
+    expect(['payload-hash-mismatch', 'hash-mismatch']).toContain(res.result.reason);
     expect(res.result.atSeq).toBe(2);
   });
 });
