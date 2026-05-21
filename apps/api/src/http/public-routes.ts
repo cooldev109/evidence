@@ -3,8 +3,10 @@ import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import { Verifier } from '@evidence/verify';
 import { MockTSAProvider, FreeTSAProvider } from '@evidence/tsa';
+import { verifyChain } from '@evidence/core';
 import type { AppDeps } from '../server.js';
 import { withTenant } from '../db/tenant-context.js';
+import { fetchChainForVerification } from '../events/repository.js';
 
 const VerifyBody = z.object({
   envelope: z
@@ -17,6 +19,80 @@ interface EvidenceRow {
   object_key: string;
   version_id: string | null;
   sha256: string;
+}
+
+interface ReportRow {
+  id: string;
+  tenant_id: string;
+  from_seq: string | number;
+  to_seq: string | number;
+  locale: string;
+  pdf_sha256: string;
+  page_count: number;
+  created_at: string;
+}
+
+export interface ReportVerification {
+  report: {
+    id: string;
+    fromSeq: number;
+    toSeq: number;
+    locale: string;
+    pdfSha256: string;
+    pageCount: number;
+    createdAt: string;
+  };
+  chain: ReturnType<typeof verifyChain>;
+  ok: boolean;
+}
+
+/**
+ * Re-verify the event range a persisted report covers. Reads the report row,
+ * fetches the events (with payloads) and runs the full chain verification so
+ * the result reflects payload tampering too. Returns null if no such report.
+ */
+async function verifyReportById(
+  deps: AppDeps,
+  reportId: string,
+): Promise<ReportVerification | null> {
+  const rows = await deps.sql<ReportRow[]>`
+    SELECT id, tenant_id, from_seq, to_seq, locale, pdf_sha256, page_count, created_at
+    FROM reports WHERE id = ${reportId} LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  const fromSeq = Number(r.from_seq);
+  const toSeq = Number(r.to_seq);
+  const events = await fetchChainForVerification(deps.sql, {
+    tenantId: r.tenant_id,
+    fromSeq,
+    toSeq,
+  });
+  const chain = verifyChain(
+    events.map((e) => ({
+      seq: e.seq,
+      tenantId: e.tenantId,
+      payloadHash: e.payloadHash,
+      prevHash: e.prevHash,
+      chainHash: e.chainHash,
+      createdAt: e.createdAt,
+      payload: e.payload,
+    })),
+    r.tenant_id,
+  );
+  return {
+    report: {
+      id: r.id,
+      fromSeq,
+      toSeq,
+      locale: r.locale,
+      pdfSha256: r.pdf_sha256,
+      pageCount: r.page_count,
+      createdAt: r.created_at,
+    },
+    chain,
+    ok: chain.ok,
+  };
 }
 
 export async function registerPublicRoutes(
@@ -116,10 +192,34 @@ export async function registerPublicRoutes(
       },
     );
 
+    scope.get<{ Params: { id: string } }>(
+      '/public/v1/reports/:id/verify',
+      {
+        schema: {
+          tags: ['public'],
+          summary: 'Re-verify the event range a legal report (PDF) covers',
+          description:
+            'No authentication required. Returns the report metadata (including the PDF SHA-256 so a holder can confirm their file) and a full chain verification of every event the report covers.',
+          params: {
+            type: 'object',
+            properties: { id: { type: 'string', format: 'uuid' } },
+            required: ['id'],
+          },
+        },
+      },
+      async (req, reply) => {
+        const result = await verifyReportById(deps, req.params.id);
+        if (!result) {
+          reply.status(404);
+          return { error: 'not_found' };
+        }
+        return result;
+      },
+    );
+
     // Minimal HTML verification page so a verifier landing from a QR code
-    // sees something human-readable rather than raw JSON. Looks up the
-    // envelope by report or event id query param and renders a short
-    // pass/fail summary.
+    // sees something human-readable rather than raw JSON. Handles either
+    // ?report=<id> (the PDF's QR target) or ?event=<id>.
     scope.get<{ Querystring: { report?: string; event?: string } }>(
       '/public/verify',
       {
@@ -129,6 +229,21 @@ export async function registerPublicRoutes(
         },
       },
       async (req, reply) => {
+        const reportId = req.query.report ?? null;
+        if (reportId) {
+          const result = await verifyReportById(deps, reportId);
+          reply.type('text/html');
+          if (!result) {
+            reply.status(404);
+            return reply.send(renderResult({ ok: false, message: 'Report not found.' }));
+          }
+          return reply.send(
+            renderResult({
+              ok: result.ok,
+              message: `Report ${result.report.id} — events ${result.report.fromSeq}–${result.report.toSeq}, ${result.report.locale}. PDF SHA-256: ${result.report.pdfSha256}.${result.ok ? '' : ' Chain check: ' + JSON.stringify(result.chain)}`,
+            }),
+          );
+        }
         const eventId = req.query.event ?? null;
         if (!eventId) {
           reply.type('text/html');

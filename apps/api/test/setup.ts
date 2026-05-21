@@ -67,7 +67,7 @@ export async function setupTestContext(): Promise<TestContext> {
 export async function resetDb(): Promise<void> {
   const sql = postgres(TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
   try {
-    await sql`TRUNCATE TABLE events, tenant_chain_tips, api_keys, tenants, event_timestamps, evidence_objects, tenant_settings RESTART IDENTITY CASCADE`;
+    await sql`TRUNCATE TABLE events, tenant_chain_tips, api_keys, tenants, event_timestamps, evidence_objects, tenant_settings, reports RESTART IDENTITY CASCADE`;
   } finally {
     await sql.end();
   }

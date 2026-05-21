@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { renderReport, resolveLocale, type ReportInput } from '@evidence/pdf';
@@ -92,8 +93,10 @@ export async function registerReportRoutes(
       );
 
       const generatedAt = new Date().toISOString();
-      const reportId = `${tenant.id.slice(0, 8)}-${generatedAt.replace(/[:.]/g, '').slice(0, 15)}`;
+      const reportId = randomUUID();
       const verificationUrl = `${deps.config.PUBLIC_BASE_URL}/public/verify`;
+      const fromSeq = events.length ? events[0].seq : 0;
+      const toSeq = events.length ? events[events.length - 1].seq : 0;
 
       const result = await renderReport({
         reportId,
@@ -114,6 +117,15 @@ export async function registerReportRoutes(
           ? { ok: true, verified: chainResult.verified }
           : { ok: false, reason: chainResult.reason, atSeq: chainResult.atSeq },
         verificationUrl,
+      });
+
+      // Persist the report so its QR (/public/verify?report=<id>) resolves to a
+      // verification of this exact event range and the PDF's SHA-256.
+      await withTenant(deps.sql, tenant.id, async (tx) => {
+        await tx`
+          INSERT INTO reports (id, tenant_id, from_seq, to_seq, locale, pdf_sha256, page_count, created_at)
+          VALUES (${reportId}, ${tenant.id}, ${fromSeq}, ${toSeq}, ${locale}, ${result.sha256}, ${result.pageCount}, ${generatedAt})
+        `;
       });
 
       reply.header('Content-Type', 'application/pdf');

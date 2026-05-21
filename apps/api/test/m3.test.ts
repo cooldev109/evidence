@@ -144,6 +144,67 @@ describe('POST /public/v1/verify (no-auth)', () => {
   });
 });
 
+describe('Report verification by id (QR deep-link flow)', () => {
+  it('persists a report and verifies its event range', async () => {
+    const { key } = await seedTenant('report-verify');
+    await post('/v1/events', key, { source: 'app', payload: { i: 1 } });
+    await post('/v1/events', key, { source: 'app', payload: { i: 2 } });
+
+    const pdf = await post('/v1/reports', key, { locale: 'pt-BR' });
+    const reportId = pdf.headers['x-evidence-report-id'] as string;
+    const pdfSha = pdf.headers['x-evidence-report-sha256'] as string;
+    expect(reportId).toMatch(/^[0-9a-f-]{36}$/);
+
+    const res = await get(`/public/v1/reports/${reportId}/verify`, null);
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.chain.ok).toBe(true);
+    expect(body.report.id).toBe(reportId);
+    expect(body.report.pdfSha256).toBe(pdfSha);
+    expect(body.report.fromSeq).toBe(1);
+    expect(body.report.toSeq).toBe(2);
+  });
+
+  it('report verification fails when an event in range is tampered', async () => {
+    const { key, tenantId } = await seedTenant('report-tamper');
+    await post('/v1/events', key, { source: 'app', payload: { i: 1 } });
+    await post('/v1/events', key, { source: 'app', payload: { i: 2 } });
+    const pdf = await post('/v1/reports', key, {});
+    const reportId = pdf.headers['x-evidence-report-id'] as string;
+
+    // Tamper an event's payload directly in the DB
+    await ctx.sql.unsafe(`
+      UPDATE events SET payload = '{"i":666}'::jsonb
+      WHERE tenant_id = '${tenantId}' AND seq = 1
+    `);
+
+    const res = await get(`/public/v1/reports/${reportId}/verify`, null);
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(false);
+    expect(body.chain.reason).toBe('payload-hash-mismatch');
+  });
+
+  it('unknown report id → 404', async () => {
+    const res = await get('/public/v1/reports/00000000-0000-0000-0000-000000000000/verify', null);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('QR deep-link /public/verify?report=<id> renders a result page', async () => {
+    const { key } = await seedTenant('report-html');
+    await post('/v1/events', key, { source: 'app', payload: { i: 1 } });
+    const pdf = await post('/v1/reports', key, {});
+    const reportId = pdf.headers['x-evidence-report-id'] as string;
+
+    const res = await get(`/public/verify?report=${reportId}`, null);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+    expect(res.body).toContain('VERIFIED');
+    expect(res.body).toContain(reportId);
+  });
+});
+
 describe('GET /public/verify (HTML landing)', () => {
   it('serves an HTML landing page', async () => {
     const res = await get('/public/verify', null);
