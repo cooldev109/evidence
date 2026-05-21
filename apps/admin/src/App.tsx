@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { IntlProvider } from 'react-intl';
 import { LOCALES, MESSAGES, resolveLocale, type Locale } from './i18n.ts';
 import { clearToken, getToken } from './api.ts';
@@ -48,7 +48,7 @@ export function App() {
 
   return (
     <IntlProvider locale={locale} messages={MESSAGES[locale]} defaultLocale="pt-BR">
-      <HashRouter>
+      <BrowserRouter>
         <Routes>
           <Route
             path="/login"
@@ -78,7 +78,7 @@ export function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </HashRouter>
+      </BrowserRouter>
     </IntlProvider>
   );
 }

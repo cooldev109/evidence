@@ -31,7 +31,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   if (res.status === 401) {
     clearToken();
-    if (!path.endsWith('/login')) window.location.hash = '#/login';
+    if (!path.endsWith('/login') && window.location.pathname !== '/login') {
+      window.location.assign('/login');
+    }
   }
   if (!res.ok) {
     let parsed: unknown = null;

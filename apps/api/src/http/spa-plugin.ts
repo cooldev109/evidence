@@ -1,19 +1,25 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 import type { FastifyInstance } from 'fastify';
 import type { AppDeps } from '../server.js';
 
+// Path prefixes owned by the API — never served the SPA fallback.
+const API_PREFIXES = ['/api', '/v1', '/admin', '/public', '/health', '/docs', '/assets'];
+
+function isApiPath(url: string): boolean {
+  const path = url.split('?')[0];
+  return API_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
+}
+
 /**
- * Serve the built React admin SPA at the site root (/). The SPA is built with
- * base=/ and uses HashRouter, so all client routes live under /#/... and
- * resolve to the same index.html. API routes (/v1, /admin/v1, /public, /docs,
- * /health, /api) are explicit and take precedence over the static wildcard.
+ * Serve the built React admin SPA at the site root (/) with BrowserRouter
+ * support. Static files (index.html, /assets/*) are served directly; any other
+ * GET that isn't an API path falls back to index.html so client-side routes
+ * like /events survive a refresh or deep link. API prefixes still 404 as JSON.
  *
- * Returns true if the SPA was mounted (dist present), false otherwise (local
- * dev without a build — the Vite dev server is used instead, and the API
- * exposes its metadata at /api).
+ * Returns true if the SPA was mounted (dist present), false otherwise.
  */
 export async function registerSpa(app: FastifyInstance, deps: AppDeps): Promise<boolean> {
   const distPath =
@@ -25,10 +31,24 @@ export async function registerSpa(app: FastifyInstance, deps: AppDeps): Promise<
     return false;
   }
 
+  const indexHtml = readFileSync(join(distPath, 'index.html'), 'utf8');
+
+  // wildcard:false serves only files that exist (index.html at /, /assets/*),
+  // so missing paths fall through to the not-found handler below.
   await app.register(fastifyStatic, {
     root: distPath,
     prefix: '/',
+    wildcard: false,
     decorateReply: false,
+  });
+
+  // SPA fallback: non-API GETs render index.html; everything else is a real 404.
+  app.setNotFoundHandler((req, reply) => {
+    if (req.method === 'GET' && !isApiPath(req.url)) {
+      reply.type('text/html').send(indexHtml);
+      return;
+    }
+    reply.status(404).send({ error: 'not_found' });
   });
 
   // Backward-compat: the panel used to live at /app.
