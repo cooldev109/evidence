@@ -16,7 +16,6 @@ export function Login({ onLogin }: { onLogin: (tenantLocale: string) => void }) 
     try {
       const res = await api.login(email, password);
       setToken(res.token);
-      // fetch tenant locale to default the UI language
       let tenantLocale = 'pt-BR';
       try {
         const me = await api.me();
@@ -34,27 +33,40 @@ export function Login({ onLogin }: { onLogin: (tenantLocale: string) => void }) 
 
   return (
     <div className="login">
-      <form className="card login-card" onSubmit={submit}>
-        <h1>EVIDENCE</h1>
-        <h2>{intl.formatMessage({ id: 'login.title' })}</h2>
-        <label>
-          {intl.formatMessage({ id: 'login.email' })}
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          {intl.formatMessage({ id: 'login.password' })}
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        {error && <p className="error">{intl.formatMessage({ id: 'login.error' })}</p>}
-        <button type="submit" disabled={busy}>
-          {intl.formatMessage({ id: 'login.submit' })}
-        </button>
-      </form>
+      <div className="login-brand">
+        <div className="mark">EVIDENCE</div>
+        <h1>Digital chain of custody</h1>
+        <p>
+          Tamper-evident events, RFC 3161 timestamps, append-only evidence, and court-ready proof —
+          verifiable by anyone.
+        </p>
+        <div className="badges">
+          <span className="chip">SHA-256 hash chain</span>
+          <span className="chip">RFC 3161 TSA</span>
+          <span className="chip">Append-only storage</span>
+          <span className="chip">PT · EN · ES</span>
+        </div>
+      </div>
+      <div className="login-form-wrap">
+        <div className="login-card">
+          <h2>{intl.formatMessage({ id: 'login.title' })}</h2>
+          <p className="hint">{intl.formatMessage({ id: 'login.email' })} · {intl.formatMessage({ id: 'login.password' })}</p>
+          <form onSubmit={submit}>
+            <label>
+              {intl.formatMessage({ id: 'login.email' })}
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+            </label>
+            <label>
+              {intl.formatMessage({ id: 'login.password' })}
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </label>
+            {error && <p className="error">{intl.formatMessage({ id: 'login.error' })}</p>}
+            <button type="submit" disabled={busy}>
+              {intl.formatMessage({ id: 'login.submit' })}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
