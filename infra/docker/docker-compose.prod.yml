@@ -57,6 +57,12 @@ services:
       TSA_BR_PROVIDER: ${TSA_BR_PROVIDER:-mock}
       TSA_EU_PROVIDER: ${TSA_EU_PROVIDER:-mock}
       TSA_US_PROVIDER: ${TSA_US_PROVIDER:-mock}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://docas.ai}
+      # Required: the stack refuses to start on the insecure default so the
+      # admin JWT can never be signed with a publicly-known secret in prod.
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
+      PUBLIC_RATE_LIMIT_MAX: ${PUBLIC_RATE_LIMIT_MAX:-60}
+      PUBLIC_RATE_LIMIT_WINDOW: ${PUBLIC_RATE_LIMIT_WINDOW:-1 minute}
     volumes:
       - evidence-store:/app/.evidence-store
     networks:
