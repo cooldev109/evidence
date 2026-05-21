@@ -52,7 +52,13 @@ export function App() {
         <Routes>
           <Route
             path="/login"
-            element={authed ? <Navigate to="/" replace /> : <Login onLogin={onLogin} />}
+            element={
+              authed ? (
+                <Navigate to="/" replace />
+              ) : (
+                <Login onLogin={onLogin} locale={locale} locales={LOCALES} onLocale={setLocale} />
+              )
+            }
           />
           <Route
             element={
