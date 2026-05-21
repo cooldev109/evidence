@@ -40,6 +40,9 @@ export async function setupTestContext(): Promise<TestContext> {
     TSA_BR_PROVIDER: 'mock',
     TSA_EU_PROVIDER: 'mock',
     TSA_US_PROVIDER: 'mock',
+    // Force the SPA to be unmounted in tests so / serves API metadata
+    // deterministically (independent of whether the admin was built).
+    ADMIN_DIST_PATH: '/nonexistent-admin-dist',
   });
   const store = new LocalFilesystemStore(storeDir);
   const tsaRegistry = buildRegistry([new MockTSAProvider()], {

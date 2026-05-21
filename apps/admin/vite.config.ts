@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 // to /admin/* and /v1/* on the same origin. In dev, Vite proxies those to the
 // local API on :3000.
 export default defineConfig({
-  base: '/app/',
+  base: '/',
   plugins: [react()],
   server: {
     port: 5173,

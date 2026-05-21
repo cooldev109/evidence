@@ -13,7 +13,7 @@ import { registerEvidenceRoutes } from './http/evidence-routes.js';
 import { registerReportRoutes } from './http/report-routes.js';
 import { registerPublicRoutes } from './http/public-routes.js';
 import { registerAdminRoutes } from './http/admin-routes.js';
-import { registerRootRoute } from './http/root-route.js';
+import { registerMetaRoute } from './http/root-route.js';
 import { registerSpa } from './http/spa-plugin.js';
 import { buildStore, buildTSARegistry } from './evidence/bootstrap.js';
 import { EvidencePersistenceService } from './evidence/persistence-service.js';
@@ -56,7 +56,6 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
     staticCSP: true,
   });
 
-  await registerRootRoute(app, deps);
   await registerHealthRoutes(app, deps);
   await registerAuth(app, deps);
   await registerEventRoutes(app, deps);
@@ -66,7 +65,10 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   await registerReportRoutes(app, deps);
   await registerPublicRoutes(app, deps);
   await registerAdminRoutes(app, deps);
-  await registerSpa(app, deps);
+  // Mount the admin SPA at / (prod). Metadata lives at /api, and also at /
+  // only when the SPA isn't mounted (dev without a build), to avoid a clash.
+  const spaMounted = await registerSpa(app, deps);
+  await registerMetaRoute(app, deps, !spaMounted);
 
   return app;
 }
