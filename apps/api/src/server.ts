@@ -12,7 +12,9 @@ import { registerHealthRoutes } from './http/health-routes.js';
 import { registerEvidenceRoutes } from './http/evidence-routes.js';
 import { registerReportRoutes } from './http/report-routes.js';
 import { registerPublicRoutes } from './http/public-routes.js';
+import { registerAdminRoutes } from './http/admin-routes.js';
 import { registerRootRoute } from './http/root-route.js';
+import { registerSpa } from './http/spa-plugin.js';
 import { buildStore, buildTSARegistry } from './evidence/bootstrap.js';
 import { EvidencePersistenceService } from './evidence/persistence-service.js';
 
@@ -63,6 +65,8 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   await registerEvidenceRoutes(app, deps);
   await registerReportRoutes(app, deps);
   await registerPublicRoutes(app, deps);
+  await registerAdminRoutes(app, deps);
+  await registerSpa(app, deps);
 
   return app;
 }

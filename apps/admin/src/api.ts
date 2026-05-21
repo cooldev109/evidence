@@ -1,0 +1,123 @@
+const TOKEN_KEY = 'evidence_admin_token';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public body: unknown,
+  ) {
+    super(`API ${status}`);
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  const res = await fetch(path, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) {
+    clearToken();
+    if (!path.endsWith('/login')) window.location.hash = '#/login';
+  }
+  if (!res.ok) {
+    let parsed: unknown = null;
+    try {
+      parsed = await res.json();
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, parsed);
+  }
+  return (await res.json()) as T;
+}
+
+export const api = {
+  login: (email: string, password: string) =>
+    request<{ token: string; user: { id: string; email: string; tenantId: string } }>(
+      'POST',
+      '/admin/v1/login',
+      { email, password },
+    ),
+  me: () => request<{ id: string; email: string; tenantId: string; tenant: Tenant }>('GET', '/admin/v1/me'),
+  overview: () => request<Overview>('GET', '/admin/v1/overview'),
+  events: (cursor?: number, limit = 25) =>
+    request<{ events: EventRow[]; nextCursor: number | null }>(
+      'GET',
+      `/admin/v1/events?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`,
+    ),
+  event: (id: string) => request<{ event: EventRow }>('GET', `/admin/v1/events/${id}`),
+  apiKeys: () => request<{ keys: ApiKey[] }>('GET', '/admin/v1/api-keys'),
+  createKey: (label: string) =>
+    request<{ id: string; key: string }>('POST', '/admin/v1/api-keys', { label }),
+  revokeKey: (id: string) => request<{ revoked: boolean }>('DELETE', `/admin/v1/api-keys/${id}`),
+  settings: () => request<{ tenant: Tenant; supportedLocales: string[] }>('GET', '/admin/v1/settings'),
+  saveSettings: (locale: string) =>
+    request<{ tenant: Tenant }>('PATCH', '/admin/v1/settings', { locale }),
+  audit: () => request<{ events: AuditRow[] }>('GET', '/admin/v1/audit'),
+};
+
+export async function downloadReport(locale: string): Promise<void> {
+  const res = await fetch('/admin/v1/reports', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${getToken()}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ locale }),
+  });
+  if (!res.ok) throw new ApiError(res.status, null);
+  const blob = await res.blob();
+  const reportId = res.headers.get('x-evidence-report-id') ?? 'report';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `evidence-${reportId}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export interface Tenant {
+  slug: string;
+  name: string;
+  locale: string;
+}
+export interface Overview {
+  tenant: Tenant;
+  eventCount: number;
+  lastSeq: number;
+  chain: { ok: boolean; reason?: string; atSeq?: number; verified?: number };
+  apiKeyCount: number;
+}
+export interface EventRow {
+  id: string;
+  seq: number;
+  source: string;
+  createdAt: string;
+  payloadHash: string;
+  prevHash: string;
+  chainHash: string;
+}
+export interface ApiKey {
+  id: string;
+  label: string;
+  createdAt: string;
+  revokedAt: string | null;
+}
+export interface AuditRow {
+  id: string;
+  actorEmail: string;
+  action: string;
+  detail: unknown;
+  createdAt: string;
+}

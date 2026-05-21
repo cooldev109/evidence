@@ -28,6 +28,11 @@ const EnvSchema = z.object({
   // Public site (used by the PDF report's QR code + verification page)
   PUBLIC_BASE_URL: z.string().default('http://docas.ai'),
 
+  // Admin panel auth
+  ADMIN_JWT_SECRET: z.string().min(16).default('dev-admin-secret-change-me-in-prod'),
+  // Optional explicit path to the built admin SPA (defaults to apps/admin/dist)
+  ADMIN_DIST_PATH: z.string().optional(),
+
   // Rate limit for public (no-auth) endpoints
   PUBLIC_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(60),
   PUBLIC_RATE_LIMIT_WINDOW: z.string().default('1 minute'),

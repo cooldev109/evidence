@@ -1,26 +1,13 @@
-import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { renderReport, resolveLocale, type ReportInput } from '@evidence/pdf';
-import { verifyChain } from '@evidence/core';
-import { localeToJurisdiction } from '@evidence/tsa';
 import type { AppDeps } from '../server.js';
-import { fetchChainRange } from '../events/repository.js';
-import { withTenant } from '../db/tenant-context.js';
+import { generateAndPersistReport } from '../reports/service.js';
 
 const ReportBody = z.object({
   fromSeq: z.coerce.number().int().min(1).optional(),
   toSeq: z.coerce.number().int().min(1).optional(),
   locale: z.string().optional(),
 });
-
-interface TimestampRow {
-  event_seq: string | number;
-  provider: string;
-  jurisdiction: string;
-  issued_at: string;
-  digest_hex: string;
-}
 
 export async function registerReportRoutes(
   app: FastifyInstance,
@@ -50,90 +37,18 @@ export async function registerReportRoutes(
         return { error: 'invalid_body', detail: parsed.error.flatten() };
       }
       const tenant = req.tenant!;
-      const locale = resolveLocale(parsed.data.locale ?? tenant.locale);
-      const events = await fetchChainRange(deps.sql, {
-        tenantId: tenant.id,
+      const r = await generateAndPersistReport(deps.sql, deps.config, {
+        tenant,
         fromSeq: parsed.data.fromSeq,
         toSeq: parsed.data.toSeq,
+        locale: parsed.data.locale,
       });
-
-      const tsRows = await withTenant(deps.sql, tenant.id, async (tx) => {
-        const rows = await tx<TimestampRow[]>`
-          SELECT e.seq AS event_seq, t.provider, t.jurisdiction, t.issued_at, t.digest_hex
-          FROM event_timestamps t
-          JOIN events e ON e.id = t.event_id
-          WHERE t.tenant_id = ${tenant.id}
-          ORDER BY e.seq ASC
-        `;
-        return rows;
-      });
-
-      const timestampsByEventId: ReportInput['timestampsByEventId'] = {};
-      for (const r of tsRows) {
-        const seq = Number(r.event_seq);
-        timestampsByEventId[seq] = timestampsByEventId[seq] ?? [];
-        timestampsByEventId[seq].push({
-          provider: r.provider,
-          issuedAt: r.issued_at,
-          digestHex: r.digest_hex,
-          jurisdiction: r.jurisdiction,
-        });
-      }
-
-      const chainResult = verifyChain(
-        events.map((e) => ({
-          seq: e.seq,
-          tenantId: e.tenantId,
-          payloadHash: e.payloadHash,
-          prevHash: e.prevHash,
-          chainHash: e.chainHash,
-          createdAt: e.createdAt,
-        })),
-        tenant.id,
-      );
-
-      const generatedAt = new Date().toISOString();
-      const reportId = randomUUID();
-      const verificationUrl = `${deps.config.PUBLIC_BASE_URL}/public/verify`;
-      const fromSeq = events.length ? events[0].seq : 0;
-      const toSeq = events.length ? events[events.length - 1].seq : 0;
-
-      const result = await renderReport({
-        reportId,
-        generatedAt,
-        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name },
-        locale,
-        jurisdiction: localeToJurisdiction(locale),
-        events: events.map((e) => ({
-          seq: e.seq,
-          source: e.source,
-          createdAt: e.createdAt,
-          payloadHash: e.payloadHash,
-          prevHash: e.prevHash,
-          chainHash: e.chainHash,
-        })),
-        timestampsByEventId,
-        chainStatus: chainResult.ok
-          ? { ok: true, verified: chainResult.verified }
-          : { ok: false, reason: chainResult.reason, atSeq: chainResult.atSeq },
-        verificationUrl,
-      });
-
-      // Persist the report so its QR (/public/verify?report=<id>) resolves to a
-      // verification of this exact event range and the PDF's SHA-256.
-      await withTenant(deps.sql, tenant.id, async (tx) => {
-        await tx`
-          INSERT INTO reports (id, tenant_id, from_seq, to_seq, locale, pdf_sha256, page_count, created_at)
-          VALUES (${reportId}, ${tenant.id}, ${fromSeq}, ${toSeq}, ${locale}, ${result.sha256}, ${result.pageCount}, ${generatedAt})
-        `;
-      });
-
       reply.header('Content-Type', 'application/pdf');
-      reply.header('Content-Disposition', `attachment; filename="evidence-${reportId}.pdf"`);
-      reply.header('X-Evidence-Report-Id', reportId);
-      reply.header('X-Evidence-Report-Sha256', result.sha256);
-      reply.header('X-Evidence-Report-Pages', String(result.pageCount));
-      return reply.send(result.pdf);
+      reply.header('Content-Disposition', `attachment; filename="evidence-${r.reportId}.pdf"`);
+      reply.header('X-Evidence-Report-Id', r.reportId);
+      reply.header('X-Evidence-Report-Sha256', r.sha256);
+      reply.header('X-Evidence-Report-Pages', String(r.pageCount));
+      return reply.send(r.pdf);
     },
   );
 }

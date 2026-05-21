@@ -14,6 +14,7 @@ WORKDIR /app
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/admin/package.json ./apps/admin/
 COPY packages/core/package.json ./packages/core/
 COPY packages/tsa/package.json ./packages/tsa/
 COPY packages/storage/package.json ./packages/storage/
@@ -21,6 +22,12 @@ COPY packages/pdf/package.json ./packages/pdf/
 COPY packages/verify/package.json ./packages/verify/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
+
+# ---- admin SPA build (produces apps/admin/dist) ----
+FROM deps AS admin-build
+COPY apps ./apps
+COPY packages ./packages
+RUN pnpm --filter @evidence/admin build
 
 # ---- runtime ----
 FROM base AS runtime
@@ -33,6 +40,8 @@ ENV NODE_ENV=production
 COPY --from=deps /app ./
 COPY apps ./apps
 COPY packages ./packages
+# Built admin SPA (served by the API at /app)
+COPY --from=admin-build /app/apps/admin/dist ./apps/admin/dist
 
 # Drop privileges
 RUN mkdir -p /app/.evidence-store && chown -R node:node /app
