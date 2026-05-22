@@ -102,6 +102,23 @@ describe('Admin endpoints', () => {
     expect(list.events).toHaveLength(1);
   });
 
+  it('event detail returns the captured content + timestamp (the evidence)', async () => {
+    const { email, apiKey } = await seedTenantWithAdmin('detail');
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      payload: { source: 'ata', payload: { tipo: 'Ata', valor: 48000 } },
+    });
+    const eventId = created.json().event.id;
+    const token = (await login(email, 'correct-horse')).json().token;
+    const detail = (await authGet(`/admin/v1/events/${eventId}`, token)).json();
+    expect(detail.payload).toEqual({ tipo: 'Ata', valor: 48000 });
+    expect(detail.timestamps).toHaveLength(1);
+    expect(detail.timestamps[0].provider).toBe('mock');
+    expect(detail.event.payloadHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
   it('creates and revokes API keys, and records audit', async () => {
     const { email } = await seedTenantWithAdmin('keys');
     const token = (await login(email, 'correct-horse')).json().token;

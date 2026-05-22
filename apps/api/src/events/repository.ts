@@ -184,6 +184,48 @@ export async function getEventById(
   });
 }
 
+export interface EventTimestamp {
+  provider: string;
+  jurisdiction: string;
+  issuedAt: string;
+  digestHex: string;
+}
+export interface EventDetail extends AppendedEvent {
+  payload: unknown;
+  timestamps: EventTimestamp[];
+}
+
+/** Full detail of one event: metadata + the captured payload + its TSA timestamps. */
+export async function getEventDetail(
+  sql: PgClient,
+  tenantId: string,
+  id: string,
+): Promise<EventDetail | null> {
+  return withTenant(sql, tenantId, async (tx) => {
+    const rows = await tx<(EventRow & { payload: unknown })[]>`
+      SELECT * FROM events WHERE tenant_id = ${tenantId} AND id = ${id} LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    const ts = await tx<
+      { provider: string; jurisdiction: string; issued_at: string; digest_hex: string }[]
+    >`
+      SELECT provider, jurisdiction, issued_at, digest_hex
+      FROM event_timestamps WHERE tenant_id = ${tenantId} AND event_id = ${id}
+      ORDER BY created_at ASC
+    `;
+    return {
+      ...rowToEvent(rows[0]),
+      payload: rows[0].payload,
+      timestamps: ts.map((t) => ({
+        provider: t.provider,
+        jurisdiction: t.jurisdiction,
+        issuedAt: t.issued_at,
+        digestHex: t.digest_hex,
+      })),
+    };
+  });
+}
+
 export interface FetchChainRangeOptions {
   tenantId: string;
   fromSeq?: number;

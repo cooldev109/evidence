@@ -61,7 +61,11 @@ export const api = {
       'GET',
       `/admin/v1/events?limit=${limit}${cursor ? `&cursor=${cursor}` : ''}`,
     ),
-  event: (id: string) => request<{ event: EventRow }>('GET', `/admin/v1/events/${id}`),
+  event: (id: string) =>
+    request<{ event: EventRow; payload: unknown; timestamps: EventTimestamp[] }>(
+      'GET',
+      `/admin/v1/events/${id}`,
+    ),
   apiKeys: () => request<{ keys: ApiKey[] }>('GET', '/admin/v1/api-keys'),
   createKey: (label: string) =>
     request<{ id: string; key: string }>('POST', '/admin/v1/api-keys', { label }),
@@ -109,6 +113,12 @@ export interface EventRow {
   payloadHash: string;
   prevHash: string;
   chainHash: string;
+}
+export interface EventTimestamp {
+  provider: string;
+  jurisdiction: string;
+  issuedAt: string;
+  digestHex: string;
 }
 export interface ApiKey {
   id: string;

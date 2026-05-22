@@ -200,5 +200,7 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .key-reveal p { margin: 0 0 10px; font-weight: 600; }
 .key-reveal code { display: block; padding: 12px 14px; background: var(--panel-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); word-break: break-all; }
 
+.payload { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin: 0; overflow-x: auto; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.card h3 { font-size: 14px; font-weight: 700; }
 .muted { color: var(--text-muted); }
 .empty { color: var(--text-muted); padding: 40px; text-align: center; background: var(--panel); border: 1px dashed var(--border-strong); border-radius: var(--radius); }

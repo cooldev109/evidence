@@ -17,7 +17,7 @@ import {
 } from '../admin/repository.js';
 import {
   listEvents,
-  getEventById,
+  getEventDetail,
   fetchChainForVerification,
 } from '../events/repository.js';
 import { createApiKey } from '../tenants/repository.js';
@@ -129,12 +129,13 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AppDeps): 
     { preHandler: requireAdmin },
     async (req, reply) => {
       const a = req.admin!;
-      const event = await getEventById(deps.sql, a.tid, req.params.id);
-      if (!event) {
+      const detail = await getEventDetail(deps.sql, a.tid, req.params.id);
+      if (!detail) {
         reply.status(404);
         return { error: 'not_found' };
       }
-      return { event };
+      const { payload, timestamps, ...event } = detail;
+      return { event, payload, timestamps };
     },
   );
 
