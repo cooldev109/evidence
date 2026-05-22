@@ -61,6 +61,14 @@ services:
       # Required: the stack refuses to start on the insecure default so the
       # admin JWT can never be signed with a publicly-known secret in prod.
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
+      # Distinct secret for end-user (capture-app) tokens. Same hard requirement
+      # so user JWTs are never signed with a publicly-known default.
+      USER_JWT_SECRET: ${USER_JWT_SECRET:?USER_JWT_SECRET is required}
+      # Speech-to-text for ATA. Set OPENAI_API_KEY in the .env file (never commit
+      # it). With provider=openai but no key, ATA falls back to mock transcripts.
+      TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-openai}
+      TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-whisper-1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PUBLIC_RATE_LIMIT_MAX: ${PUBLIC_RATE_LIMIT_MAX:-60}
       PUBLIC_RATE_LIMIT_WINDOW: ${PUBLIC_RATE_LIMIT_WINDOW:-1 minute}
     volumes:

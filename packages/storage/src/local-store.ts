@@ -8,6 +8,7 @@ import {
   type GetEvidenceResult,
   type HeadEvidenceResult,
   type PutEvidenceInput,
+  type PutObjectInput,
   type PutEvidenceResult,
   type RetainMode,
 } from './types.js';
@@ -94,6 +95,46 @@ export class LocalFilesystemStore implements EvidenceStore {
       sha256,
       contentType: manifest?.contentType,
     };
+  }
+
+  async putObject(input: PutObjectInput): Promise<PutEvidenceResult> {
+    const objectKey = input.objectKey;
+    const target = this.pathFor(objectKey);
+    if (existsSync(target)) {
+      const manifest = await this.readManifest(objectKey);
+      throw new ImmutabilityViolation(objectKey, manifest?.retainUntil ?? 'forever');
+    }
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, input.body, { mode: 0o400 });
+    try {
+      await chmod(target, 0o400);
+    } catch {
+      /* best effort */
+    }
+    const sha256 = sha256Hex(input.body);
+    const retainMode: RetainMode = input.retainMode ?? 'none';
+    const manifest: RetentionManifestEntry = {
+      retainUntil: input.retainUntil,
+      retainMode,
+      sha256,
+      sizeBytes: input.body.length,
+      contentType: input.contentType,
+      createdAt: new Date().toISOString(),
+    };
+    await writeFile(this.manifestPath(objectKey), JSON.stringify(manifest), { mode: 0o400 });
+    return {
+      store: 'local',
+      bucket: this.bucket,
+      objectKey,
+      sizeBytes: input.body.length,
+      sha256,
+      retainUntil: input.retainUntil,
+      retainMode,
+    };
+  }
+
+  async getObject(objectKey: string): Promise<GetEvidenceResult> {
+    return this.getEvidence(objectKey);
   }
 
   async headEvidence(objectKey: string): Promise<HeadEvidenceResult> {

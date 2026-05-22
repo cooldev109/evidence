@@ -9,6 +9,7 @@ import { loadConfig } from '../src/config.js';
 import { LocalFilesystemStore } from '@evidence/storage';
 import { MockTSAProvider, buildRegistry } from '@evidence/tsa';
 import { EvidencePersistenceService } from '../src/evidence/persistence-service.js';
+import { MockTranscriber } from '../src/transcription/index.js';
 import type { FastifyInstance } from 'fastify';
 
 export const TEST_DATABASE_URL =
@@ -52,7 +53,7 @@ export async function setupTestContext(): Promise<TestContext> {
     US: 'mock',
   });
   const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry });
-  const app = await buildServer({ config, sql, persistence });
+  const app = await buildServer({ config, sql, persistence, transcriber: new MockTranscriber() });
   await app.ready();
   return {
     app,
@@ -70,7 +71,7 @@ export async function setupTestContext(): Promise<TestContext> {
 export async function resetDb(): Promise<void> {
   const sql = postgres(TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
   try {
-    await sql`TRUNCATE TABLE events, tenant_chain_tips, api_keys, tenants, event_timestamps, evidence_objects, tenant_settings, reports, admin_users, audit_events RESTART IDENTITY CASCADE`;
+    await sql`TRUNCATE TABLE events, tenant_chain_tips, api_keys, tenants, event_timestamps, evidence_objects, tenant_settings, reports, admin_users, audit_events, app_users, captures, ata_signers RESTART IDENTITY CASCADE`;
   } finally {
     await sql.end();
   }

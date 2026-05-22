@@ -22,6 +22,15 @@ import {
 } from '../events/repository.js';
 import { createApiKey } from '../tenants/repository.js';
 import { generateAndPersistReport } from '../reports/service.js';
+import {
+  createAppUser,
+  listAppUsers,
+  setAppUserDisabled,
+  listCapturesForTenant,
+  getCapture,
+  AppUserEmailTaken,
+} from '../userapp/repository.js';
+import { listSignersByCapture } from '../userapp/signers.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -41,6 +50,12 @@ const ReportBody = z.object({
   locale: z.string().optional(),
 });
 const SettingsBody = z.object({ locale: z.enum(['pt-BR', 'en-US', 'es-ES']) });
+const CreateUserBody = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(256),
+  name: z.string().max(256).optional(),
+});
+const DisableUserBody = z.object({ disabled: z.boolean() });
 
 export async function registerAdminRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   const requireAdmin = async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -258,6 +273,131 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AppDeps): 
     });
     return { tenant: await getTenantSettings(deps.sql, a.tid) };
   });
+
+  // ---- End users (the people who use the capture app) ----
+  app.get('/admin/v1/users', { preHandler: requireAdmin }, async (req) => {
+    const a = req.admin!;
+    const users = await listAppUsers(deps.sql, a.tid);
+    // never expose password hashes
+    return {
+      users: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        createdAt: u.createdAt,
+        lastLoginAt: u.lastLoginAt,
+        disabledAt: u.disabledAt,
+      })),
+    };
+  });
+
+  app.post('/admin/v1/users', { preHandler: requireAdmin }, async (req, reply) => {
+    const parsed = CreateUserBody.safeParse(req.body);
+    if (!parsed.success) {
+      reply.status(400);
+      return { error: 'invalid_body', detail: parsed.error.flatten() };
+    }
+    const a = req.admin!;
+    try {
+      const user = await createAppUser(deps.sql, {
+        tenantId: a.tid,
+        email: parsed.data.email,
+        password: parsed.data.password,
+        name: parsed.data.name,
+      });
+      await recordAudit(deps.sql, {
+        tenantId: a.tid,
+        actorEmail: a.email,
+        action: 'app_user.create',
+        detail: { appUserId: user.id, email: user.email },
+      });
+      reply.status(201);
+      return { user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt } };
+    } catch (err) {
+      if (err instanceof AppUserEmailTaken) {
+        reply.status(409);
+        return { error: 'email_taken' };
+      }
+      throw err;
+    }
+  });
+
+  app.patch<{ Params: { id: string } }>(
+    '/admin/v1/users/:id',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const parsed = DisableUserBody.safeParse(req.body);
+      if (!parsed.success) {
+        reply.status(400);
+        return { error: 'invalid_body' };
+      }
+      const a = req.admin!;
+      const ok = await setAppUserDisabled(deps.sql, a.tid, req.params.id, parsed.data.disabled);
+      if (!ok) {
+        reply.status(404);
+        return { error: 'not_found' };
+      }
+      await recordAudit(deps.sql, {
+        tenantId: a.tid,
+        actorEmail: a.email,
+        action: parsed.data.disabled ? 'app_user.disable' : 'app_user.enable',
+        detail: { appUserId: req.params.id },
+      });
+      return { ok: true };
+    },
+  );
+
+  // ---- Review end users' captures (photos/videos/audio/ATA) ----
+  app.get<{ Querystring: { userId?: string } }>(
+    '/admin/v1/captures',
+    { preHandler: requireAdmin },
+    async (req) => {
+      const a = req.admin!;
+      const captures = await listCapturesForTenant(deps.sql, a.tid, req.query.userId);
+      return { captures };
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/admin/v1/captures/:id',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const a = req.admin!;
+      const capture = await getCapture(deps.sql, a.tid, req.params.id);
+      if (!capture) {
+        reply.status(404);
+        return { error: 'not_found' };
+      }
+      const detail = await getEventDetail(deps.sql, a.tid, capture.eventId);
+      const signers =
+        capture.kind === 'ata'
+          ? (await listSignersByCapture(deps.sql, a.tid, capture.id)).map((s) => ({
+              name: s.name,
+              email: s.email,
+              signed: !!s.signedAt,
+              signedAt: s.signedAt,
+            }))
+          : [];
+      return { capture, event: detail, signers };
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/admin/v1/captures/:id/media',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const a = req.admin!;
+      const capture = await getCapture(deps.sql, a.tid, req.params.id);
+      if (!capture) {
+        reply.status(404);
+        return { error: 'not_found' };
+      }
+      const { body, contentType } = await deps.persistence.getMedia(capture.objectKey);
+      reply.header('Content-Type', contentType ?? capture.contentType);
+      reply.header('X-Evidence-Sha256', capture.mediaSha256);
+      return reply.send(body);
+    },
+  );
 
   // ---- Audit log ----
   app.get('/admin/v1/audit', { preHandler: requireAdmin }, async (req) => {

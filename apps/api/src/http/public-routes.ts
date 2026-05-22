@@ -6,13 +6,23 @@ import { MockTSAProvider, FreeTSAProvider } from '@evidence/tsa';
 import { verifyChain } from '@evidence/core';
 import type { AppDeps } from '../server.js';
 import { withTenant } from '../db/tenant-context.js';
-import { fetchChainForVerification } from '../events/repository.js';
+import {
+  fetchChainForVerification,
+  appendEvent,
+  getEventById,
+} from '../events/repository.js';
+import { getCapture } from '../userapp/repository.js';
+import { getTenantSettings } from '../admin/repository.js';
+import { findSignerByToken, markSignerSigned } from '../userapp/signers.js';
+import { computeRetainUntil } from '../evidence/bootstrap.js';
 
 const VerifyBody = z.object({
   envelope: z
     .union([z.string(), z.record(z.unknown())])
     .describe('A canonical evidence envelope (JSON string or object)'),
 });
+
+const SignBody = z.object({ name: z.string().max(200).optional() });
 
 interface EvidenceRow {
   tenant_id: string;
@@ -214,6 +224,106 @@ export async function registerPublicRoutes(
           return { error: 'not_found' };
         }
         return result;
+      },
+    );
+
+    // ---- ATA click-to-sign (public, no auth) ----
+    // A participant opens /assinar/:token, reviews the ATA, and signs. Signing
+    // appends its own chained + RFC-3161 event, so each signature is
+    // independently tamper-evident and time-anchored.
+    scope.get<{ Params: { token: string } }>(
+      '/public/v1/ata/sign/:token',
+      { schema: { tags: ['public'], summary: 'Fetch an ATA for click-to-sign by token' } },
+      async (req, reply) => {
+        const signer = await findSignerByToken(deps.sql, req.params.token);
+        if (!signer) {
+          reply.status(404);
+          return { error: 'not_found' };
+        }
+        const capture = await getCapture(deps.sql, signer.tenantId, signer.captureId);
+        const tenant = await getTenantSettings(deps.sql, signer.tenantId);
+        return {
+          signed: !!signer.signedAt,
+          signer: { name: signer.name, email: signer.email, signedAt: signer.signedAt },
+          ata: capture
+            ? {
+                title: capture.title,
+                transcript: capture.transcript,
+                capturedAt: capture.capturedAt,
+                geo: capture.geo,
+                organization: tenant?.name ?? null,
+              }
+            : null,
+        };
+      },
+    );
+
+    scope.post<{ Params: { token: string } }>(
+      '/public/v1/ata/sign/:token',
+      {
+        schema: {
+          tags: ['public'],
+          summary: 'Record a click-to-sign signature for an ATA',
+          body: { type: 'object', properties: { name: { type: 'string' } } },
+        },
+      },
+      async (req, reply) => {
+        const parsed = SignBody.safeParse(req.body ?? {});
+        if (!parsed.success) {
+          reply.status(400);
+          return { error: 'invalid_body' };
+        }
+        const signer = await findSignerByToken(deps.sql, req.params.token);
+        if (!signer) {
+          reply.status(404);
+          return { error: 'not_found' };
+        }
+        // Idempotent: a second submit just returns the existing signature.
+        if (signer.signedAt) {
+          return { signed: true, signedAt: signer.signedAt, alreadySigned: true };
+        }
+
+        const ataEvent = await getEventById(deps.sql, signer.tenantId, signer.eventId);
+        if (!ataEvent) {
+          reply.status(404);
+          return { error: 'ata_not_found' };
+        }
+        const tenant = await getTenantSettings(deps.sql, signer.tenantId);
+        const signedAt = new Date().toISOString();
+        const signerName = (parsed.data.name ?? signer.name ?? '').slice(0, 200);
+
+        // Seal the signature as its own chained event bound to the ATA's hash.
+        const payload = {
+          type: 'ata-signature',
+          method: 'click-to-sign',
+          captureId: signer.captureId,
+          ataEventId: signer.eventId,
+          ataPayloadHash: ataEvent.payloadHash,
+          signerId: signer.id,
+          signerName,
+          signerEmail: signer.email,
+          signedAt,
+          ip: req.ip,
+          userAgent: String(req.headers['user-agent'] ?? '').slice(0, 400),
+        };
+        const sigEvent = await appendEvent(deps.sql, {
+          tenantId: signer.tenantId,
+          source: 'app:ata-signature',
+          payload,
+        });
+        await deps.persistence.persist({
+          tenantId: signer.tenantId,
+          tenantLocale: tenant?.locale ?? 'pt-BR',
+          event: sigEvent,
+          payload,
+          retainMode: deps.config.RETAIN_MODE,
+          retainUntilIso:
+            deps.config.RETAIN_MODE === 'none' ? null : computeRetainUntil(deps.config.RETAIN_YEARS),
+          kmsKeyId: deps.config.STORAGE_KMS_KEY_ID,
+        });
+        await markSignerSigned(deps.sql, signer.tenantId, signer.id, sigEvent.id, signedAt);
+
+        return { signed: true, signedAt, signatureEventId: sigEvent.id };
       },
     );
 

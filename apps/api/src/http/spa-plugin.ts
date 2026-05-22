@@ -6,7 +6,9 @@ import type { FastifyInstance } from 'fastify';
 import type { AppDeps } from '../server.js';
 
 // Path prefixes owned by the API — never served the SPA fallback.
-const API_PREFIXES = ['/api', '/v1', '/admin', '/public', '/health', '/docs', '/assets'];
+// `/app/v1/*` is the end-user capture API; `/app` (no trailing segment) is the
+// user web app and is allowed to fall through to the SPA.
+const API_PREFIXES = ['/api', '/v1', '/admin/v1', '/app/v1', '/public', '/health', '/docs', '/assets'];
 
 function isApiPath(url: string): boolean {
   const path = url.split('?')[0];
@@ -50,10 +52,6 @@ export async function registerSpa(app: FastifyInstance, deps: AppDeps): Promise<
     }
     reply.status(404).send({ error: 'not_found' });
   });
-
-  // Backward-compat: the panel used to live at /app.
-  app.get('/app', async (_req, reply) => reply.redirect('/'));
-  app.get('/app/', async (_req, reply) => reply.redirect('/'));
 
   return true;
 }

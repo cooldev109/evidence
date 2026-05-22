@@ -11,6 +11,7 @@ import {
   type GetEvidenceResult,
   type HeadEvidenceResult,
   type PutEvidenceInput,
+  type PutObjectInput,
   type PutEvidenceResult,
   type RetainMode,
 } from './types.js';
@@ -85,6 +86,40 @@ export class S3ObjectLockStore implements EvidenceStore {
       retainMode,
       kmsKeyId,
     };
+  }
+
+  async putObject(input: PutObjectInput): Promise<PutEvidenceResult> {
+    const kmsKeyId = input.kmsKeyId ?? this.defaultKmsKeyId;
+    const retainMode: RetainMode = input.retainMode ?? 'governance';
+    const objectLockMode =
+      retainMode === 'compliance' ? 'COMPLIANCE' : retainMode === 'governance' ? 'GOVERNANCE' : undefined;
+    const res = await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: input.objectKey,
+        Body: input.body,
+        ContentType: input.contentType ?? 'application/octet-stream',
+        ServerSideEncryption: kmsKeyId ? 'aws:kms' : undefined,
+        SSEKMSKeyId: kmsKeyId,
+        ObjectLockMode: objectLockMode,
+        ObjectLockRetainUntilDate: input.retainUntil ? new Date(input.retainUntil) : undefined,
+      }),
+    );
+    return {
+      store: 's3',
+      bucket: this.bucket,
+      objectKey: input.objectKey,
+      versionId: res.VersionId,
+      sizeBytes: input.body.length,
+      sha256: sha256Hex(input.body),
+      retainUntil: input.retainUntil,
+      retainMode,
+      kmsKeyId,
+    };
+  }
+
+  async getObject(objectKey: string, versionId?: string): Promise<GetEvidenceResult> {
+    return this.getEvidence(objectKey, versionId);
   }
 
   async getEvidence(objectKey: string, versionId?: string): Promise<GetEvidenceResult> {

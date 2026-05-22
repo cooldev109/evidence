@@ -25,11 +25,18 @@ const EnvSchema = z.object({
   TSA_EU_PROVIDER: z.enum(['mock', 'freetsa', 'eidas']).default('mock'),
   TSA_US_PROVIDER: z.enum(['mock', 'freetsa', 'us-digicert']).default('mock'),
 
+  // Speech-to-text (ATA transcription)
+  TRANSCRIPTION_PROVIDER: z.enum(['mock', 'openai']).default('mock'),
+  TRANSCRIPTION_MODEL: z.string().default('whisper-1'),
+  OPENAI_API_KEY: z.string().optional(),
+
   // Public site (used by the PDF report's QR code + verification page)
   PUBLIC_BASE_URL: z.string().default('http://docas.ai'),
 
   // Admin panel auth
   ADMIN_JWT_SECRET: z.string().min(16).default('dev-admin-secret-change-me-in-prod'),
+  // End-user (capture-app) auth — distinct secret from the admin panel
+  USER_JWT_SECRET: z.string().min(16).default('dev-user-secret-change-me-in-prod'),
   // Optional explicit path to the built admin SPA (defaults to apps/admin/dist)
   ADMIN_DIST_PATH: z.string().optional(),
 

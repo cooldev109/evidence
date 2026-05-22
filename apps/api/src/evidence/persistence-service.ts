@@ -126,6 +126,43 @@ export class EvidencePersistenceService {
     });
   }
 
+  /**
+   * Store a raw media file (photo/video/audio/ATA document) at its own key in
+   * the immutable store. The file's sha256 is sealed into the chained event's
+   * payload and RFC-3161 timestamp, so this object is tamper-evident even
+   * though it lives beside the JSON envelope.
+   */
+  async storeMedia(opts: {
+    tenantId: string;
+    objectKey: string;
+    body: Buffer;
+    contentType: string;
+    retainMode: RetainMode;
+    retainUntilIso: string | null;
+    kmsKeyId?: string;
+  }): Promise<{ objectKey: string; bucket: string; sha256: string; sizeBytes: number; store: string }> {
+    const put = await this.deps.store.putObject({
+      objectKey: opts.objectKey,
+      body: opts.body,
+      contentType: opts.contentType,
+      retainMode: opts.retainMode,
+      retainUntil: opts.retainUntilIso ?? undefined,
+      kmsKeyId: opts.kmsKeyId,
+    });
+    return {
+      objectKey: put.objectKey,
+      bucket: put.bucket,
+      sha256: put.sha256,
+      sizeBytes: put.sizeBytes,
+      store: put.store,
+    };
+  }
+
+  async getMedia(objectKey: string): Promise<{ body: Buffer; contentType?: string }> {
+    const got = await this.deps.store.getObject(objectKey);
+    return { body: got.body, contentType: got.contentType };
+  }
+
   async getEnvelopeForEvent(
     tenantId: string,
     eventId: string,

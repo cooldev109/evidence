@@ -13,15 +13,18 @@ import { registerEvidenceRoutes } from './http/evidence-routes.js';
 import { registerReportRoutes } from './http/report-routes.js';
 import { registerPublicRoutes } from './http/public-routes.js';
 import { registerAdminRoutes } from './http/admin-routes.js';
+import { registerUserAppRoutes } from './http/userapp-routes.js';
 import { registerMetaRoute } from './http/root-route.js';
 import { registerSpa } from './http/spa-plugin.js';
 import { buildStore, buildTSARegistry } from './evidence/bootstrap.js';
 import { EvidencePersistenceService } from './evidence/persistence-service.js';
+import { buildTranscriber, type Transcriber } from './transcription/index.js';
 
 export interface AppDeps {
   config: AppConfig;
   sql: PgClient;
   persistence: EvidencePersistenceService;
+  transcriber: Transcriber;
 }
 
 export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
@@ -65,6 +68,7 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   await registerReportRoutes(app, deps);
   await registerPublicRoutes(app, deps);
   await registerAdminRoutes(app, deps);
+  await registerUserAppRoutes(app, deps);
   // Mount the admin SPA at / (prod). Metadata lives at /api, and also at /
   // only when the SPA isn't mounted (dev without a build), to avoid a clash.
   const spaMounted = await registerSpa(app, deps);
@@ -79,7 +83,8 @@ async function main(): Promise<void> {
   const store = buildStore(config);
   const tsaRegistry = buildTSARegistry(config);
   const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry });
-  const app = await buildServer({ config, sql, persistence });
+  const transcriber = buildTranscriber(config);
+  const app = await buildServer({ config, sql, persistence, transcriber });
   try {
     await app.listen({ host: config.API_HOST, port: config.API_PORT });
   } catch (err) {

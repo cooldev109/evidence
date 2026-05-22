@@ -57,11 +57,23 @@ export interface HeadEvidenceResult {
   exists: boolean;
 }
 
+export interface PutObjectInput {
+  objectKey: string;
+  body: Buffer;
+  contentType?: string;
+  retainUntil?: string;
+  retainMode?: RetainMode;
+  kmsKeyId?: string;
+}
+
 export interface EvidenceStore {
   readonly id: 'local' | 's3';
   putEvidence(input: PutEvidenceInput): Promise<PutEvidenceResult>;
   getEvidence(objectKey: string, versionId?: string): Promise<GetEvidenceResult>;
   headEvidence(objectKey: string, versionId?: string): Promise<HeadEvidenceResult>;
+  /** Store an arbitrary object (e.g. a media file) at an explicit key, append-only. */
+  putObject(input: PutObjectInput): Promise<PutEvidenceResult>;
+  getObject(objectKey: string, versionId?: string): Promise<GetEvidenceResult>;
 }
 
 export class ImmutabilityViolation extends Error {
