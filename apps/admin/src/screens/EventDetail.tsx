@@ -26,7 +26,7 @@ export function EventDetail() {
 
   return (
     <div>
-      <Link to="/events">← {intl.formatMessage({ id: 'event.back' })}</Link>
+      <Link to="/admin/events">← {intl.formatMessage({ id: 'event.back' })}</Link>
       <h1>
         <FormattedMessage id="event.title" /> #{event.seq}
       </h1>

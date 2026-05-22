@@ -10,6 +10,8 @@ import {
   IconKeys,
   IconSettings,
   IconAudit,
+  IconUsers,
+  IconCamera,
 } from '../icons.tsx';
 
 interface Props {
@@ -20,12 +22,14 @@ interface Props {
 }
 
 const NAV = [
-  { to: '/', key: 'nav.dashboard', end: true, Icon: IconDashboard },
-  { to: '/events', key: 'nav.events', end: false, Icon: IconEvents },
-  { to: '/reports', key: 'nav.reports', end: false, Icon: IconReports },
-  { to: '/keys', key: 'nav.keys', end: false, Icon: IconKeys },
-  { to: '/settings', key: 'nav.settings', end: false, Icon: IconSettings },
-  { to: '/audit', key: 'nav.audit', end: false, Icon: IconAudit },
+  { to: '/admin', key: 'nav.dashboard', end: true, Icon: IconDashboard },
+  { to: '/admin/users', key: 'nav.users', end: false, Icon: IconUsers },
+  { to: '/admin/captures', key: 'nav.captures', end: false, Icon: IconCamera },
+  { to: '/admin/events', key: 'nav.events', end: false, Icon: IconEvents },
+  { to: '/admin/reports', key: 'nav.reports', end: false, Icon: IconReports },
+  { to: '/admin/keys', key: 'nav.keys', end: false, Icon: IconKeys },
+  { to: '/admin/settings', key: 'nav.settings', end: false, Icon: IconSettings },
+  { to: '/admin/audit', key: 'nav.audit', end: false, Icon: IconAudit },
 ];
 
 export function Layout({ locale, locales, onLocale, onLogout }: Props) {

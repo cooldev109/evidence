@@ -30,6 +30,15 @@ export const IconAudit = (p: P) => (
 export const IconShield = (p: P) => (
   <svg {...s} {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>
 );
+export const IconUsers = (p: P) => (
+  <svg {...s} {...p}><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><path d="M16 5.2a3.2 3.2 0 0 1 0 6M17 14.5a5.5 5.5 0 0 1 3.5 4.5" /></svg>
+);
+export const IconCamera = (p: P) => (
+  <svg {...s} {...p}><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L19 6h0a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></svg>
+);
+export const IconPin = (p: P) => (
+  <svg {...s} {...p}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.5" /></svg>
+);
 export const IconHash = (p: P) => (
   <svg {...s} {...p}><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" /></svg>
 );

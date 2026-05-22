@@ -31,8 +31,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   if (res.status === 401) {
     clearToken();
-    if (!path.endsWith('/login') && window.location.pathname !== '/login') {
-      window.location.assign('/login');
+    if (!path.endsWith('/login') && window.location.pathname !== '/admin/login') {
+      window.location.assign('/admin/login');
     }
   }
   if (!res.ok) {
@@ -74,6 +74,22 @@ export const api = {
   saveSettings: (locale: string) =>
     request<{ tenant: Tenant }>('PATCH', '/admin/v1/settings', { locale }),
   audit: () => request<{ events: AuditRow[] }>('GET', '/admin/v1/audit'),
+  users: () => request<{ users: AppUserRow[] }>('GET', '/admin/v1/users'),
+  createUser: (email: string, password: string, name: string) =>
+    request<{ user: AppUserRow }>('POST', '/admin/v1/users', { email, password, name }),
+  setUserDisabled: (id: string, disabled: boolean) =>
+    request<{ ok: boolean }>('PATCH', `/admin/v1/users/${id}`, { disabled }),
+  captures: (userId?: string) =>
+    request<{ captures: CaptureRow[] }>(
+      'GET',
+      `/admin/v1/captures${userId ? `?userId=${userId}` : ''}`,
+    ),
+  capture: (id: string) =>
+    request<{
+      capture: CaptureRow;
+      event: { payload: unknown; timestamps: EventTimestamp[] } | null;
+      signers: AdminSigner[];
+    }>('GET', `/admin/v1/captures/${id}`),
 };
 
 export async function downloadReport(locale: string): Promise<void> {
@@ -132,4 +148,32 @@ export interface AuditRow {
   action: string;
   detail: unknown;
   createdAt: string;
+}
+export interface AppUserRow {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  disabledAt: string | null;
+}
+export interface CaptureRow {
+  id: string;
+  appUserId: string;
+  eventId: string;
+  kind: 'photo' | 'video' | 'audio' | 'ata';
+  title: string;
+  contentType: string;
+  sizeBytes: number;
+  mediaSha256: string;
+  geo: { lat?: number; lng?: number; accuracy?: number; address?: string } | null;
+  capturedAt: string;
+  createdAt: string;
+  transcript: string | null;
+}
+export interface AdminSigner {
+  name: string;
+  email: string;
+  signed: boolean;
+  signedAt: string | null;
 }

@@ -40,7 +40,7 @@ export function Events() {
             {events.map((e) => (
               <tr key={e.id}>
                 <td>
-                  <Link to={`/events/${e.id}`}>{e.seq}</Link>
+                  <Link to={`/admin/events/${e.id}`}>{e.seq}</Link>
                 </td>
                 <td>{e.source}</td>
                 <td>{e.createdAt}</td>

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { IntlProvider } from 'react-intl';
 import { LOCALES, MESSAGES, resolveLocale, type Locale } from './i18n.ts';
 import { clearToken, getToken } from './api.ts';
+import { clearUserToken, getUserToken } from './user/userApi.ts';
 import { Layout } from './components/Layout.tsx';
 import { Login } from './screens/Login.tsx';
 import { Dashboard } from './screens/Dashboard.tsx';
@@ -12,11 +13,20 @@ import { Reports } from './screens/Reports.tsx';
 import { ApiKeys } from './screens/ApiKeys.tsx';
 import { Settings } from './screens/Settings.tsx';
 import { Audit } from './screens/Audit.tsx';
+import { Users } from './screens/Users.tsx';
+import { Captures } from './screens/Captures.tsx';
+import { UserLayout } from './user/UserLayout.tsx';
+import { UserLogin } from './user/UserLogin.tsx';
+import { MinhasProvas } from './user/MinhasProvas.tsx';
+import { Capture } from './user/Capture.tsx';
+import { ProvaDetail } from './user/ProvaDetail.tsx';
+import { AtaSign } from './user/AtaSign.tsx';
 
-const LOCALE_KEY = 'evidence_admin_locale';
+const LOCALE_KEY = 'evidence_locale';
 
 export function App() {
-  const [authed, setAuthed] = useState<boolean>(() => !!getToken());
+  const [adminAuthed, setAdminAuthed] = useState<boolean>(() => !!getToken());
+  const [userAuthed, setUserAuthed] = useState<boolean>(() => !!getUserToken());
   const [locale, setLocaleState] = useState<Locale>(() =>
     resolveLocale(localStorage.getItem(LOCALE_KEY)),
   );
@@ -26,62 +36,126 @@ export function App() {
     setLocaleState(l);
   }, []);
 
-  // Keep auth state in sync if the token is cleared elsewhere (401 handler).
   useEffect(() => {
-    const onStorage = () => setAuthed(!!getToken());
+    const onStorage = () => {
+      setAdminAuthed(!!getToken());
+      setUserAuthed(!!getUserToken());
+    };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const onLogin = useCallback(
+  const onAdminLogin = useCallback(
     (tenantLocale: string) => {
       if (!localStorage.getItem(LOCALE_KEY)) setLocale(resolveLocale(tenantLocale));
-      setAuthed(true);
+      setAdminAuthed(true);
     },
     [setLocale],
   );
-
-  const onLogout = useCallback(() => {
+  const onAdminLogout = useCallback(() => {
     clearToken();
-    setAuthed(false);
+    setAdminAuthed(false);
+  }, []);
+
+  const onUserLogin = useCallback(
+    (tenantLocale: string) => {
+      if (!localStorage.getItem(LOCALE_KEY)) setLocale(resolveLocale(tenantLocale));
+      setUserAuthed(true);
+    },
+    [setLocale],
+  );
+  const onUserLogout = useCallback(() => {
+    clearUserToken();
+    setUserAuthed(false);
   }, []);
 
   return (
     <IntlProvider locale={locale} messages={MESSAGES[locale]} defaultLocale="pt-BR">
       <BrowserRouter>
         <Routes>
+          {/* ---------- Admin panel (docas.ai/admin) ---------- */}
+          <Route
+            path="/admin/login"
+            element={
+              adminAuthed ? (
+                <Navigate to="/admin" replace />
+              ) : (
+                <Login
+                  onLogin={onAdminLogin}
+                  locale={locale}
+                  locales={LOCALES}
+                  onLocale={setLocale}
+                />
+              )
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              adminAuthed ? (
+                <Layout
+                  locale={locale}
+                  locales={LOCALES}
+                  onLocale={setLocale}
+                  onLogout={onAdminLogout}
+                />
+              ) : (
+                <Navigate to="/admin/login" replace />
+              )
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="events" element={<Events />} />
+            <Route path="events/:id" element={<EventDetail />} />
+            <Route path="users" element={<Users />} />
+            <Route path="captures" element={<Captures />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="keys" element={<ApiKeys />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="audit" element={<Audit />} />
+          </Route>
+
+          {/* ---------- Public ATA signing (no auth, tokenized link) ---------- */}
+          <Route
+            path="/assinar/:token"
+            element={<AtaSign locale={locale} locales={LOCALES} onLocale={setLocale} />}
+          />
+
+          {/* ---------- End-user capture app (docas.ai/) ---------- */}
           <Route
             path="/login"
             element={
-              authed ? (
+              userAuthed ? (
                 <Navigate to="/" replace />
               ) : (
-                <Login onLogin={onLogin} locale={locale} locales={LOCALES} onLocale={setLocale} />
+                <UserLogin
+                  onLogin={onUserLogin}
+                  locale={locale}
+                  locales={LOCALES}
+                  onLocale={setLocale}
+                />
               )
             }
           />
           <Route
             element={
-              authed ? (
-                <Layout
+              userAuthed ? (
+                <UserLayout
                   locale={locale}
                   locales={LOCALES}
                   onLocale={setLocale}
-                  onLogout={onLogout}
+                  onLogout={onUserLogout}
                 />
               ) : (
                 <Navigate to="/login" replace />
               )
             }
           >
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/events" element={<Events />} />
-            <Route path="/events/:id" element={<EventDetail />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/keys" element={<ApiKeys />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/audit" element={<Audit />} />
+            <Route path="/" element={<MinhasProvas />} />
+            <Route path="/capturar" element={<Capture />} />
+            <Route path="/prova/:id" element={<ProvaDetail />} />
           </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
