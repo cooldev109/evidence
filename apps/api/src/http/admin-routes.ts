@@ -55,7 +55,7 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AppDeps): 
   };
 
   // ---- Login (no auth) ----
-  app.post('/admin/v1/login', { schema: { tags: ['admin'], summary: 'Admin login' } }, async (req, reply) => {
+  app.post('/admin/v1/login', { schema: { tags: ['admin'], summary: 'Admin login', body: { type: 'object', required: ['email', 'password'], properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } } } } }, async (req, reply) => {
     const parsed = LoginBody.safeParse(req.body);
     if (!parsed.success) {
       reply.status(400);

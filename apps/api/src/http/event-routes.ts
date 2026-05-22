@@ -32,8 +32,29 @@ const RangeQuery = z.object({
   toSeq: z.coerce.number().int().min(1).optional(),
 });
 
+const bearer = [{ bearerAuth: [] }];
+
 export async function registerEventRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
-  app.post('/v1/events', { preHandler: app.requireTenant }, async (req, reply) => {
+  app.post(
+    '/v1/events',
+    {
+      preHandler: app.requireTenant,
+      schema: {
+        tags: ['events'],
+        summary: 'Capture an event (REST ingestion)',
+        security: bearer,
+        body: {
+          type: 'object',
+          required: ['source', 'payload'],
+          properties: {
+            source: { type: 'string', minLength: 1, maxLength: 128, examples: ['checkout'] },
+            externalId: { type: 'string', description: 'Optional idempotency key' },
+            payload: { type: 'object', additionalProperties: true, examples: [{ orderId: '123', amount: 4990 }] },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
     const body = PostEventBody.safeParse(req.body);
     if (!body.success) {
       reply.status(400);
@@ -70,7 +91,24 @@ export async function registerEventRoutes(app: FastifyInstance, deps: AppDeps): 
     }
   });
 
-  app.get('/v1/events', { preHandler: app.requireTenant }, async (req, reply) => {
+  app.get(
+    '/v1/events',
+    {
+      preHandler: app.requireTenant,
+      schema: {
+        tags: ['events'],
+        summary: 'List events (paginated)',
+        security: bearer,
+        querystring: {
+          type: 'object',
+          properties: {
+            cursor: { type: 'integer', minimum: 0 },
+            limit: { type: 'integer', minimum: 1, maximum: 500 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
     const q = ListQuery.safeParse(req.query);
     if (!q.success) {
       reply.status(400);
@@ -83,11 +121,20 @@ export async function registerEventRoutes(app: FastifyInstance, deps: AppDeps): 
       limit: q.data.limit,
     });
     return { events, nextCursor };
-  });
+    },
+  );
 
   app.get<{ Params: { id: string } }>(
     '/v1/events/:id',
-    { preHandler: app.requireTenant },
+    {
+      preHandler: app.requireTenant,
+      schema: {
+        tags: ['events'],
+        summary: 'Get one event by id',
+        security: bearer,
+        params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } }, required: ['id'] },
+      },
+    },
     async (req, reply) => {
       const tenant = req.tenant!;
       const event = await getEventById(deps.sql, tenant.id, req.params.id);
@@ -99,7 +146,24 @@ export async function registerEventRoutes(app: FastifyInstance, deps: AppDeps): 
     },
   );
 
-  app.get('/v1/chain', { preHandler: app.requireTenant }, async (req, reply) => {
+  app.get(
+    '/v1/chain',
+    {
+      preHandler: app.requireTenant,
+      schema: {
+        tags: ['events'],
+        summary: 'Fetch a contiguous chain range',
+        security: bearer,
+        querystring: {
+          type: 'object',
+          properties: {
+            fromSeq: { type: 'integer', minimum: 1 },
+            toSeq: { type: 'integer', minimum: 1 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
     const q = RangeQuery.safeParse(req.query);
     if (!q.success) {
       reply.status(400);
@@ -112,5 +176,6 @@ export async function registerEventRoutes(app: FastifyInstance, deps: AppDeps): 
       toSeq: q.data.toSeq,
     });
     return { events };
-  });
+    },
+  );
 }

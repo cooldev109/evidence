@@ -13,7 +13,24 @@ export async function registerVerifyRoutes(
   app: FastifyInstance,
   deps: AppDeps,
 ): Promise<void> {
-  app.get('/v1/verify', { preHandler: app.requireTenant }, async (req, reply) => {
+  app.get(
+    '/v1/verify',
+    {
+      preHandler: app.requireTenant,
+      schema: {
+        tags: ['events'],
+        summary: 'Verify the tenant chain (detects tampering)',
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            fromSeq: { type: 'integer', minimum: 1 },
+            toSeq: { type: 'integer', minimum: 1 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
     const q = VerifyQuery.safeParse(req.query);
     if (!q.success) {
       reply.status(400);
@@ -38,5 +55,6 @@ export async function registerVerifyRoutes(
       tenant.id,
     );
     return { result, range: { fromSeq: q.data.fromSeq ?? 1, toSeq: q.data.toSeq ?? null } };
-  });
+    },
+  );
 }
