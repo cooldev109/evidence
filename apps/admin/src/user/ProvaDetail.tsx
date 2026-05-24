@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { userApi, mediaUrl, type CaptureDetail, type OwnerSigner } from './userApi.ts';
+import { userApi, mediaUrl, getUserToken, type CaptureDetail, type OwnerSigner } from './userApi.ts';
 import { IconShield, IconPin, IconHash } from '../icons.tsx';
+import { AuthedImage, AuthedVideo, AuthedAudio, AuthedDownloadLink } from '../lib/AuthedMedia.tsx';
 
 function SignerRow({ signer }: { signer: OwnerSigner }) {
   const [copied, setCopied] = useState(false);
@@ -73,11 +74,11 @@ export function ProvaDetail() {
 
       <div className="u-detail-media">
         {capture.kind === 'photo' ? (
-          <img src={mediaUrl(capture.id)} alt={capture.title} />
+          <AuthedImage src={mediaUrl(capture.id)} alt={capture.title} getToken={getUserToken} />
         ) : capture.kind === 'video' ? (
-          <video src={mediaUrl(capture.id)} controls />
+          <AuthedVideo src={mediaUrl(capture.id)} getToken={getUserToken} />
         ) : capture.kind === 'audio' ? (
-          <audio src={mediaUrl(capture.id)} controls />
+          <AuthedAudio src={mediaUrl(capture.id)} getToken={getUserToken} />
         ) : (
           <div className="u-capture-placeholder">{capture.kind.toUpperCase()}</div>
         )}
@@ -154,9 +155,14 @@ export function ProvaDetail() {
         </div>
       </dl>
 
-      <a className="u-btn-ghost u-download" href={mediaUrl(capture.id)} target="_blank" rel="noreferrer">
+      <AuthedDownloadLink
+        src={mediaUrl(capture.id)}
+        filename={`${capture.id}.${capture.contentType.split('/')[1] ?? 'bin'}`}
+        getToken={getUserToken}
+        className="u-btn-ghost u-download"
+      >
         <FormattedMessage id="u.detail.download" />
-      </a>
+      </AuthedDownloadLink>
     </div>
   );
 }

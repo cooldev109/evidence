@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { userApi, type Capture } from './userApi.ts';
+import { userApi, getUserToken, type Capture } from './userApi.ts';
 import { IconShield, IconPin } from '../icons.tsx';
+import { AuthedImage } from '../lib/AuthedMedia.tsx';
 
 const KIND_EMOJI: Record<Capture['kind'], string> = {
   photo: '📷',
@@ -56,7 +57,7 @@ export function MinhasProvas() {
             <Link key={c.id} to={`/prova/${c.id}`} className="u-prova-card">
               <div className="u-prova-thumb">
                 {c.kind === 'photo' ? (
-                  <img src={`/app/v1/captures/${c.id}/media`} alt={c.title} loading="lazy" />
+                  <AuthedImage src={`/app/v1/captures/${c.id}/media`} alt={c.title} getToken={getUserToken} />
                 ) : (
                   <span className="u-prova-emoji">{KIND_EMOJI[c.kind]}</span>
                 )}

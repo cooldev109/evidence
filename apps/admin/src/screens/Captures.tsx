@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { api, type CaptureRow, type AppUserRow, type AdminSigner } from '../api.ts';
+import { api, getToken, type CaptureRow, type AppUserRow, type AdminSigner } from '../api.ts';
+import { AuthedImage, AuthedVideo, AuthedAudio, AuthedDownloadLink } from '../lib/AuthedMedia.tsx';
 
 const KIND_EMOJI: Record<CaptureRow['kind'], string> = {
   photo: '📷',
@@ -84,11 +85,11 @@ export function Captures() {
             </button>
             <div className="cap-modal-media">
               {selected.kind === 'photo' ? (
-                <img src={`/admin/v1/captures/${selected.id}/media`} alt={selected.title} />
+                <AuthedImage src={`/admin/v1/captures/${selected.id}/media`} alt={selected.title} getToken={getToken} />
               ) : selected.kind === 'video' ? (
-                <video src={`/admin/v1/captures/${selected.id}/media`} controls />
+                <AuthedVideo src={`/admin/v1/captures/${selected.id}/media`} getToken={getToken} />
               ) : selected.kind === 'audio' ? (
-                <audio src={`/admin/v1/captures/${selected.id}/media`} controls />
+                <AuthedAudio src={`/admin/v1/captures/${selected.id}/media`} getToken={getToken} />
               ) : (
                 <div className="u-capture-placeholder">{selected.kind.toUpperCase()}</div>
               )}
@@ -150,14 +151,14 @@ export function Captures() {
                 </tr>
               </tbody>
             </table>
-            <a
+            <AuthedDownloadLink
               className="link"
-              href={`/admin/v1/captures/${selected.id}/media`}
-              target="_blank"
-              rel="noreferrer"
+              src={`/admin/v1/captures/${selected.id}/media`}
+              filename={`${selected.id}.${selected.contentType.split('/')[1] ?? 'bin'}`}
+              getToken={getToken}
             >
               <FormattedMessage id="u.detail.download" />
-            </a>
+            </AuthedDownloadLink>
           </div>
         </div>
       )}

@@ -354,6 +354,9 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .u-ts-provider { color: var(--text-faint); }
 .u-download { display: block; text-align: center; }
 
+/* Authed media loading placeholder (while we fetch the bytes with Bearer) */
+.u-media-loading { background: linear-gradient(100deg, #e8eaf2 30%, #f4f5fb 50%, #e8eaf2 70%); background-size: 200% 100%; animation: u-shimmer 1.3s infinite; min-height: 120px; border-radius: 10px; }
+
 /* ATA */
 .u-ata-hint { background: var(--brand-50); color: var(--brand-600); border-radius: 10px; padding: 10px 14px; font-size: 12.5px; font-weight: 500; margin: 0 0 14px; line-height: 1.45; }
 .u-participants { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
