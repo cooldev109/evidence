@@ -23,7 +23,7 @@ const DEFAULT_EXT: Record<string, string> = {
   'audio/mp4': 'm4a',
   'audio/x-m4a': 'm4a',
   'audio/aac': 'm4a',
-  'audio/webm': 'weba',
+  'audio/webm': 'webm',
   'audio/ogg': 'ogg',
   'audio/mpeg': 'mp3',
   'audio/wav': 'wav',

@@ -76,7 +76,10 @@ function captureExtension(contentType: string): string {
     'audio/mp4': 'm4a',
     'audio/aac': 'm4a',
     'audio/x-m4a': 'm4a',
-    'audio/webm': 'weba',
+    // Whisper's accepted-extensions list includes 'webm' but NOT 'weba', and
+    // it uses the extension as its primary format hint. Use 'webm' for audio
+    // too; the content-type still distinguishes audio from video.
+    'audio/webm': 'webm',
     'audio/ogg': 'ogg',
     'audio/mpeg': 'mp3',
     'audio/wav': 'wav',
