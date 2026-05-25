@@ -60,18 +60,31 @@ const GeoSchema = z
   .strict();
 
 function captureExtension(contentType: string): string {
+  // Strip codecs/charset/etc parameters: 'audio/webm;codecs=opus' -> 'audio/webm'.
+  const base = contentType.split(';')[0].trim().toLowerCase();
   const map: Record<string, string> = {
     'image/jpeg': 'jpg',
     'image/png': 'png',
     'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heic',
     'video/mp4': 'mp4',
     'video/webm': 'webm',
+    'video/quicktime': 'mov',
+    // iPhone Safari MediaRecorder outputs audio/mp4; Whisper needs the right
+    // extension (m4a) to detect the format, otherwise it rejects the upload.
+    'audio/mp4': 'm4a',
+    'audio/aac': 'm4a',
+    'audio/x-m4a': 'm4a',
     'audio/webm': 'weba',
+    'audio/ogg': 'ogg',
     'audio/mpeg': 'mp3',
     'audio/wav': 'wav',
+    'audio/wave': 'wav',
+    'audio/x-wav': 'wav',
     'application/pdf': 'pdf',
   };
-  return map[contentType] ?? 'bin';
+  return map[base] ?? 'bin';
 }
 
 interface ParsedUpload {

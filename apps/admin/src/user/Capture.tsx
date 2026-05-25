@@ -15,14 +15,23 @@ const ACCEPT: Record<Kind, string> = {
 const DEFAULT_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
+  'image/heic': 'heic',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
+  'video/quicktime': 'mov',
+  // iOS Safari MediaRecorder produces audio/mp4 — Whisper needs an m4a hint.
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/aac': 'm4a',
   'audio/webm': 'weba',
+  'audio/ogg': 'ogg',
   'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
 };
 
 function extFor(type: string): string {
-  return DEFAULT_EXT[type] ?? 'bin';
+  const base = type.split(';')[0].trim().toLowerCase();
+  return DEFAULT_EXT[base] ?? 'bin';
 }
 
 export function Capture() {
