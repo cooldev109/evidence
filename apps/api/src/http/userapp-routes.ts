@@ -374,21 +374,30 @@ export async function registerUserAppRoutes(app: FastifyInstance, deps: AppDeps)
       }
 
       // 1. Speech-to-text.
+      const sttFilename = `ata.${captureExtension(fileContentType)}`;
+      req.log.info(
+        { contentType: fileContentType, filename: sttFilename, size: fileBuf.length, language },
+        'ATA: forwarding to transcriber',
+      );
       let transcript = '';
       let transcriptionMeta = { provider: deps.transcriber.id, model: '', language };
       try {
         const r = await deps.transcriber.transcribe({
           audio: fileBuf,
           contentType: fileContentType,
-          filename: `ata.${captureExtension(fileContentType)}`,
+          filename: sttFilename,
           language,
         });
         transcript = r.text;
         transcriptionMeta = { provider: r.provider, model: r.model, language: r.language ?? language };
       } catch (err) {
-        req.log.error({ err }, 'ATA transcription failed');
+        const detail = err instanceof Error ? err.message.slice(0, 500) : String(err);
+        req.log.error(
+          { err, contentType: fileContentType, filename: sttFilename, size: fileBuf.length },
+          'ATA transcription failed',
+        );
         reply.status(502);
-        return { error: 'transcription_failed' };
+        return { error: 'transcription_failed', detail };
       }
 
       const tenant = await getTenantSettings(deps.sql, u.tid);

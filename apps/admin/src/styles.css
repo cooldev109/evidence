@@ -279,7 +279,7 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .u-btn-primary.sm { width: auto; padding: 8px 14px; font-size: 13px; }
 .u-btn-ghost { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); padding: 12px; border-radius: 10px; font-weight: 600; }
 .u-btn-ghost:hover:not(:disabled) { background: var(--panel-2); }
-.u-error { background: var(--bad-bg); color: var(--bad); padding: 10px 12px; border-radius: 8px; font-size: 13px; text-align: center; }
+.u-error { background: var(--bad-bg); color: var(--bad); padding: 10px 12px; border-radius: 8px; font-size: 13px; text-align: center; white-space: pre-line; word-break: break-word; }
 
 /* user pages */
 .u-page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { uploadCapture, uploadAta, type CaptureGeo, type AtaParticipant } from './userApi.ts';
+import { uploadCapture, uploadAta, ApiError, type CaptureGeo, type AtaParticipant } from './userApi.ts';
 import { IconPin } from '../icons.tsx';
 
 type Kind = 'photo' | 'video' | 'audio' | 'ata';
@@ -98,11 +98,27 @@ export function Capture() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
+      // Explicitly pick a mimeType the browser supports; otherwise some Android
+      // and Safari versions either leave rec.mimeType empty or pick something
+      // Whisper can't handle.
+      const candidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+      ];
+      const supported = candidates.find(
+        (t) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(t),
+      );
+      const rec = supported
+        ? new MediaRecorder(stream, { mimeType: supported })
+        : new MediaRecorder(stream);
       chunksRef.current = [];
       rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' });
+        const finalType = rec.mimeType || supported || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: finalType });
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         setFile(blob);
         setPreviewUrl(URL.createObjectURL(blob));
@@ -146,8 +162,14 @@ export function Capture() {
         await uploadCapture(file, `${kind}.${extFor(type)}`, { kind, title, capturedAt, geo });
       }
       navigate('/');
-    } catch {
-      setError(intl.formatMessage({ id: 'u.capture.error' }));
+    } catch (err) {
+      let msg = intl.formatMessage({ id: 'u.capture.error' });
+      if (err instanceof ApiError && err.body && typeof err.body === 'object') {
+        const body = err.body as { error?: string; detail?: string };
+        const detail = body.detail || body.error;
+        if (detail) msg = `${msg}\n${detail}`;
+      }
+      setError(msg);
     } finally {
       setBusy(false);
     }
