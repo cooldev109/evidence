@@ -232,7 +232,16 @@ export function Capture() {
           )
         ) : (
           <div className="u-capture-placeholder">
-            <FormattedMessage id={`u.kind.${kind}`} />
+            {(() => {
+              const KindIcon = KIND_ICONS[kind];
+              return <KindIcon className="u-capture-placeholder-icon" />;
+            })()}
+            <div className="u-capture-placeholder-title">
+              <FormattedMessage id={`u.capture.empty.${kind}.title`} />
+            </div>
+            <div className="u-capture-placeholder-sub">
+              <FormattedMessage id={`u.capture.empty.${kind}.sub`} />
+            </div>
           </div>
         )}
       </div>
@@ -255,9 +264,15 @@ export function Capture() {
             <FormattedMessage id="u.capture.retake" />
           </button>
         ) : isAudioKind ? (
-          <button className={recording ? 'u-btn-rec recording' : 'u-btn-rec'} onClick={toggleRecording}>
-            <FormattedMessage id={recording ? 'u.capture.stop' : 'u.capture.recordAudio'} />
-          </button>
+          recording ? (
+            <button className="u-btn-rec recording" onClick={toggleRecording}>
+              <FormattedMessage id="u.capture.stop" />
+            </button>
+          ) : (
+            <button className="u-btn-primary u-btn-mic" onClick={toggleRecording}>
+              <FormattedMessage id="u.capture.recordAudio" />
+            </button>
+          )
         ) : (
           <button className="u-btn-primary" onClick={() => fileInput.current?.click()}>
             <FormattedMessage id={kind === 'photo' ? 'u.capture.takePhoto' : 'u.capture.recordVideo'} />
@@ -321,9 +336,14 @@ export function Capture() {
       <button className={`u-location u-location-${geoState}`} onClick={requestLocation} type="button">
         <IconPin />
         {geoState === 'ok' && geo ? (
-          <span>
-            {geo.lat?.toFixed(5)}, {geo.lng?.toFixed(5)}
-            {geo.accuracy ? ` (±${Math.round(geo.accuracy)}m)` : ''}
+          <span className="u-location-text">
+            <span className="u-location-label">
+              <FormattedMessage id="u.capture.locationCaptured" />
+            </span>
+            <span className="u-location-coords">
+              {geo.lat?.toFixed(5)}, {geo.lng?.toFixed(5)}
+              {geo.accuracy ? ` · ±${Math.round(geo.accuracy)}m` : ''}
+            </span>
           </span>
         ) : geoState === 'locating' ? (
           <FormattedMessage id="u.capture.locating" />
