@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { Locale } from '../i18n.ts';
 import { getAtaForSigning, signAta, type AtaSignView } from './userApi.ts';
-import { IconShield } from '../icons.tsx';
+import { IconShield, IconSun, IconMoon } from '../icons.tsx';
+import { useTheme } from '../lib/useTheme.ts';
 
 interface Props {
   locale: Locale;
@@ -14,6 +15,7 @@ interface Props {
 export function AtaSign({ locale, locales, onLocale }: Props) {
   const intl = useIntl();
   const { token } = useParams<{ token: string }>();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [view, setView] = useState<AtaSignView | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [name, setName] = useState('');
@@ -47,8 +49,17 @@ export function AtaSign({ locale, locales, onLocale }: Props) {
   return (
     <div className="u-login">
       <div className="u-login-card u-sign-card">
-        <div className="u-login-locale" style={{ marginTop: 0, marginBottom: 14, textAlign: 'right' }}>
-          <select value={locale} onChange={(e) => onLocale(e.target.value as Locale)}>
+        <div className="u-sign-toprow">
+          <button
+            type="button"
+            className="u-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          >
+            {theme === 'dark' ? <IconSun /> : <IconMoon />}
+          </button>
+          <select className="locale-select" value={locale} onChange={(e) => onLocale(e.target.value as Locale)}>
             {locales.map((l) => (
               <option key={l} value={l}>
                 {l}

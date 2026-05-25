@@ -3,7 +3,8 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { FormattedMessage } from 'react-intl';
 import type { Locale } from '../i18n.ts';
 import { userApi } from './userApi.ts';
-import { IconCamera, IconShield } from '../icons.tsx';
+import { IconCamera, IconShield, IconSun, IconMoon } from '../icons.tsx';
+import { useTheme } from '../lib/useTheme.ts';
 
 interface Props {
   locale: Locale;
@@ -15,6 +16,7 @@ interface Props {
 export function UserLayout({ locale, locales, onLocale, onLogout }: Props) {
   const [name, setName] = useState('');
   const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
   useEffect(() => {
     userApi
       .me()
@@ -31,6 +33,15 @@ export function UserLayout({ locale, locales, onLocale, onLogout }: Props) {
         </div>
         <div className="u-top-right">
           {name && <span className="u-who">{name}</span>}
+          <button
+            type="button"
+            className="u-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          >
+            {theme === 'dark' ? <IconSun /> : <IconMoon />}
+          </button>
           <select
             className="locale-select"
             value={locale}

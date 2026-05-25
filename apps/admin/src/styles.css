@@ -229,34 +229,71 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 /* ============================================================
    End-user capture app (mobile-first)
    ============================================================ */
-/* ---- user-app design tokens ---- */
-.u-shell {
-  --u-bg:        #f5f6fb;
-  --u-surface:   #ffffff;
-  --u-surface-2: #fafbff;
-  --u-border:    #e6e8f0;
+/* ============================================================
+   USER-APP DESIGN TOKENS — defined at :root so they're available
+   both inside .u-shell (main app) AND inside .u-login (public
+   signing page), and so [data-theme="dark"] can override them.
+   ============================================================ */
+:root {
+  --u-bg:            #f5f6fb;
+  --u-surface:       #ffffff;
+  --u-surface-2:     #fafbff;
+  --u-surface-overlay: rgba(255,255,255,0.92);
+  --u-border:        #e6e8f0;
   --u-border-strong: #d4d8e6;
-  --u-text:      #0f172a;
-  --u-text-muted:#5e6478;
-  --u-text-faint:#97a0b5;
-  --u-brand:     #4f46e5;
-  --u-brand-2:   #7c3aed;
-  --u-brand-soft:#eef2ff;
-  --u-record:    #dc2626;
-  --u-record-bg: #fee2e2;
-  --u-ok:        #047857;
-  --u-ok-bg:     #d1fae5;
-  --u-ok-border: #a7f3d0;
-  --u-warn:      #b45309;
-  --u-shadow-sm: 0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.04);
-  --u-shadow-md: 0 4px 16px rgba(15,23,42,0.08);
-  --u-shadow-lg: 0 12px 40px rgba(15,23,42,0.16);
-  --u-glow-brand: 0 8px 22px rgba(79,70,229,0.35);
+  --u-text:          #0f172a;
+  --u-text-muted:    #5e6478;
+  --u-text-faint:    #97a0b5;
+  --u-brand:         #4f46e5;
+  --u-brand-2:       #7c3aed;
+  --u-brand-soft:    #eef2ff;
+  --u-record:        #dc2626;
+  --u-record-bg:     #fee2e2;
+  --u-ok:            #047857;
+  --u-ok-bg:         #d1fae5;
+  --u-ok-border:     #a7f3d0;
+  --u-warn:          #b45309;
+  --u-shadow-sm:     0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.04);
+  --u-shadow-md:     0 4px 16px rgba(15,23,42,0.08);
+  --u-shadow-lg:     0 12px 40px rgba(15,23,42,0.16);
+  --u-glow-brand:    0 8px 22px rgba(79,70,229,0.35);
   /* per-kind accents */
-  --kind-photo:  #0284c7;  --kind-photo-bg:#e0f2fe;
-  --kind-video:  #d97706;  --kind-video-bg:#fef3c7;
-  --kind-audio:  #0d9488;  --kind-audio-bg:#ccfbf1;
-  --kind-ata:    #7c3aed;  --kind-ata-bg:  #ede9fe;
+  --kind-photo:      #0284c7;  --kind-photo-bg: #e0f2fe;
+  --kind-video:      #d97706;  --kind-video-bg: #fef3c7;
+  --kind-audio:      #0d9488;  --kind-audio-bg: #ccfbf1;
+  --kind-ata:        #7c3aed;  --kind-ata-bg:   #ede9fe;
+}
+
+/* Tell the browser's native controls (scrollbar, select dropdown) to
+   match the active theme. */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* ---- night mode override ---- */
+:root[data-theme="dark"] {
+  --u-bg:            #0b1120;
+  --u-surface:       #161d31;
+  --u-surface-2:     #1c2540;
+  --u-surface-overlay: rgba(11,17,32,0.92);
+  --u-border:        rgba(255,255,255,0.08);
+  --u-border-strong: rgba(255,255,255,0.18);
+  --u-text:          #eef2fb;
+  --u-text-muted:    #a4adc4;
+  --u-text-faint:    #707a96;
+  --u-brand-soft:    rgba(124,58,237,0.20);
+  --u-record-bg:     rgba(239,68,68,0.16);
+  --u-ok:            #34d399;
+  --u-ok-bg:         rgba(16,185,129,0.18);
+  --u-ok-border:     rgba(16,185,129,0.40);
+  --u-warn:          #fbbf24;
+  --u-shadow-sm:     0 1px 2px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.35);
+  --u-shadow-md:     0 4px 18px rgba(0,0,0,0.45);
+  --u-shadow-lg:     0 16px 50px rgba(0,0,0,0.6);
+  --u-glow-brand:    0 8px 28px rgba(124,58,237,0.45);
+  --kind-photo-bg:   rgba(14,165,233,0.18);
+  --kind-video-bg:   rgba(245,158,11,0.18);
+  --kind-audio-bg:   rgba(20,184,166,0.18);
+  --kind-ata-bg:     rgba(167,139,250,0.20);
 }
 
 /* ---- shell ---- */
@@ -269,10 +306,18 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 /* ---- header ---- */
 .u-topbar {
   height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
-  padding: 0 16px; background: var(--u-surface); border-bottom: 1px solid var(--u-border);
+  padding: 0 16px; background: var(--u-surface-overlay); border-bottom: 1px solid var(--u-border);
   position: sticky; top: 0; z-index: 10;
   backdrop-filter: saturate(180%) blur(8px);
 }
+.u-theme-toggle {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  background: var(--u-surface-2); border: 1px solid var(--u-border); border-radius: 8px;
+  color: var(--u-text-muted); cursor: pointer; padding: 0;
+  transition: color 100ms ease, background 100ms ease, border-color 100ms ease;
+}
+.u-theme-toggle:hover:not(:disabled) { color: var(--u-brand); border-color: var(--u-brand); background: var(--u-brand-soft); }
+.u-theme-toggle svg { width: 16px; height: 16px; }
 .u-shell .brand-logo {
   width: 34px; height: 34px; border-radius: 10px;
   background: linear-gradient(135deg, var(--u-brand) 0%, var(--u-brand-2) 100%);
@@ -283,11 +328,13 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .u-brand { display: flex; align-items: center; gap: 11px; font-weight: 800; letter-spacing: 2px; font-size: 14px; color: var(--u-text); }
 .u-top-right { display: flex; align-items: center; gap: 10px; }
 .u-who { color: var(--u-text-muted); font-size: 12.5px; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.u-shell .locale-select {
+.u-shell .locale-select,
+.u-login .locale-select {
   border: 1px solid var(--u-border); background: var(--u-surface-2); color: var(--u-text-muted);
   padding: 6px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; min-width: auto; cursor: pointer;
 }
-.u-shell .locale-select:focus { outline: none; border-color: var(--u-brand); box-shadow: 0 0 0 3px var(--u-brand-soft); }
+.u-shell .locale-select:focus,
+.u-login .locale-select:focus { outline: none; border-color: var(--u-brand); box-shadow: 0 0 0 3px var(--u-brand-soft); }
 .u-shell button.link { color: var(--u-brand); font-weight: 700; font-size: 13px; padding: 6px 10px; border-radius: 8px; background: transparent; }
 .u-shell button.link:hover:not(:disabled) { background: var(--u-brand-soft); }
 
@@ -298,7 +345,7 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 560px; min-height: 68px;
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(255,255,255,0.92); backdrop-filter: saturate(180%) blur(10px);
+  background: var(--u-surface-overlay); backdrop-filter: saturate(180%) blur(10px);
   border-top: 1px solid var(--u-border);
   display: flex; align-items: center; justify-content: space-around;
   z-index: 20;
@@ -329,10 +376,10 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .u-capture-fab:hover:not(:disabled) { background: linear-gradient(135deg, var(--u-brand), var(--u-brand-2)); transform: translateY(-1px); box-shadow: 0 12px 28px rgba(79,70,229,0.5); }
 .u-capture-fab:active { transform: translateY(0); }
 
-/* ---- user login (kept dark/brand) ---- */
+/* ---- user login + public sign page (always dark backdrop) ---- */
 .u-login { min-height: 100vh; display: grid; place-items: center; padding: 24px;
   background: radial-gradient(900px 500px at 50% -10%, #2a2f54 0%, transparent 55%), linear-gradient(160deg, #161a2e, #2b2069 120%); }
-.u-login-card { background: var(--u-surface); border-radius: 20px; box-shadow: var(--u-shadow-lg); width: 100%; max-width: 380px; padding: 36px 28px; }
+.u-login-card { background: var(--u-surface); color: var(--u-text); border-radius: 20px; box-shadow: var(--u-shadow-lg); width: 100%; max-width: 380px; padding: 36px 28px; }
 .u-login-brand { text-align: center; margin-bottom: 24px; }
 .u-login-brand h1 { font-size: 26px; letter-spacing: 4px; margin: 16px 0 8px; color: var(--u-text); font-weight: 800; }
 .u-login-brand p { color: var(--u-text-muted); font-size: 13.5px; margin: 0; }
@@ -595,6 +642,7 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .u-signers .link:hover:not(:disabled) { background: var(--u-brand-soft); }
 
 .u-sign-card { max-width: 460px; }
+.u-sign-toprow { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
 .u-sign-done { text-align: center; padding: 16px 0; }
 .u-sign-done svg { width: 56px; height: 56px; color: var(--u-ok); background: var(--u-ok-bg); padding: 12px; border-radius: 20px; margin-bottom: 12px; }
 .u-sign-done h2 { font-size: 20px; font-weight: 800; margin: 0 0 14px; color: var(--u-text); }

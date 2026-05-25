@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google" content="notranslate" />
     <title>EVIDENCE</title>
+    <script>
+      // Apply the saved (or system-preferred) theme before React mounts, so
+      // there's no flash of the wrong theme on first paint.
+      (function () {
+        try {
+          var saved = localStorage.getItem('evidence_theme');
+          var sys = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          var t = (saved === 'dark' || saved === 'light') ? saved : sys;
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body translate="no" class="notranslate">
     <div id="root"></div>

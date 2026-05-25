@@ -51,6 +51,12 @@ export const IconClock = (p: P) => (
 export const IconCheck = (p: P) => (
   <svg {...s} {...p}><path d="M5 12l5 5L20 7" /></svg>
 );
+export const IconSun = (p: P) => (
+  <svg {...s} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5" /></svg>
+);
+export const IconMoon = (p: P) => (
+  <svg {...s} {...p}><path d="M20.5 14.5A8 8 0 0 1 9.5 3.5a8 8 0 1 0 11 11z" /></svg>
+);
 export const IconPin = (p: P) => (
   <svg {...s} {...p}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );
