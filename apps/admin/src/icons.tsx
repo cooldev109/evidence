@@ -36,6 +36,21 @@ export const IconUsers = (p: P) => (
 export const IconCamera = (p: P) => (
   <svg {...s} {...p}><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L19 6h0a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></svg>
 );
+export const IconVideo = (p: P) => (
+  <svg {...s} {...p}><rect x="2.5" y="6" width="13.5" height="12" rx="2" /><path d="M16 10l5.5-3v10L16 14z" /></svg>
+);
+export const IconMic = (p: P) => (
+  <svg {...s} {...p}><rect x="9" y="2.5" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18.5v3M8.5 21.5h7" /></svg>
+);
+export const IconDocument = (p: P) => (
+  <svg {...s} {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M8 13h8M8 17h5" /></svg>
+);
+export const IconClock = (p: P) => (
+  <svg {...s} {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+);
+export const IconCheck = (p: P) => (
+  <svg {...s} {...p}><path d="M5 12l5 5L20 7" /></svg>
+);
 export const IconPin = (p: P) => (
   <svg {...s} {...p}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );

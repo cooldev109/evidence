@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { uploadCapture, uploadAta, ApiError, type CaptureGeo, type AtaParticipant } from './userApi.ts';
-import { IconPin } from '../icons.tsx';
+import { IconPin, IconCamera, IconVideo, IconMic, IconDocument, IconShield } from '../icons.tsx';
 
 type Kind = 'photo' | 'video' | 'audio' | 'ata';
+
+const KIND_ICONS: Record<Kind, React.ComponentType<{ className?: string }>> = {
+  photo: IconCamera,
+  video: IconVideo,
+  audio: IconMic,
+  ata: IconDocument,
+};
 
 const ACCEPT: Record<Kind, string> = {
   photo: 'image/*',
@@ -176,7 +183,7 @@ export function Capture() {
   }
 
   return (
-    <div className="u-page">
+    <div className="u-page" data-kind={kind}>
       <div className="u-page-head">
         <h1>
           <FormattedMessage id="u.capture.title" />
@@ -184,25 +191,33 @@ export function Capture() {
       </div>
 
       {/* Type selector */}
-      <div className="u-segment">
-        {(['photo', 'video', 'audio', 'ata'] as Kind[]).map((k) => (
-          <button
-            key={k}
-            className={kind === k ? 'active' : ''}
-            onClick={() => {
-              setKind(k);
-              reset();
-            }}
-          >
-            <FormattedMessage id={`u.kind.${k}`} />
-          </button>
-        ))}
+      <div className="u-segment" role="tablist">
+        {(['photo', 'video', 'audio', 'ata'] as Kind[]).map((k) => {
+          const Icon = KIND_ICONS[k];
+          return (
+            <button
+              key={k}
+              role="tab"
+              aria-selected={kind === k}
+              data-kind={k}
+              className={kind === k ? 'active' : ''}
+              onClick={() => {
+                setKind(k);
+                reset();
+              }}
+            >
+              <Icon />
+              <span><FormattedMessage id={`u.kind.${k}`} /></span>
+            </button>
+          );
+        })}
       </div>
 
       {kind === 'ata' && (
-        <p className="u-ata-hint">
-          <FormattedMessage id="u.capture.ataHint" />
-        </p>
+        <div className="u-ata-hint" role="note">
+          <IconShield />
+          <span><FormattedMessage id="u.capture.ataHint" /></span>
+        </div>
       )}
 
       {/* Capture surface */}

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { userApi, getUserToken, type Capture } from './userApi.ts';
-import { IconShield, IconPin } from '../icons.tsx';
+import { IconShield, IconPin, IconClock, IconCamera, IconVideo, IconMic, IconDocument } from '../icons.tsx';
 import { AuthedImage } from '../lib/AuthedMedia.tsx';
 
-const KIND_EMOJI: Record<Capture['kind'], string> = {
-  photo: '📷',
-  video: '🎬',
-  audio: '🎙️',
-  ata: '📝',
+const KIND_ICON: Record<Capture['kind'], React.ComponentType<{ className?: string }>> = {
+  photo: IconCamera,
+  video: IconVideo,
+  audio: IconMic,
+  ata: IconDocument,
 };
 
 export function MinhasProvas() {
@@ -53,29 +53,36 @@ export function MinhasProvas() {
         </div>
       ) : (
         <div className="u-prova-grid">
-          {captures.map((c) => (
-            <Link key={c.id} to={`/prova/${c.id}`} className="u-prova-card">
-              <div className="u-prova-thumb">
-                {c.kind === 'photo' ? (
-                  <AuthedImage src={`/app/v1/captures/${c.id}/media`} alt={c.title} getToken={getUserToken} />
-                ) : (
-                  <span className="u-prova-emoji">{KIND_EMOJI[c.kind]}</span>
-                )}
-                <span className="u-prova-badge">{intl.formatMessage({ id: `u.kind.${c.kind}` })}</span>
-              </div>
-              <div className="u-prova-meta">
-                <strong>{c.title || intl.formatMessage({ id: `u.kind.${c.kind}` })}</strong>
-                <span className="u-prova-date">
-                  {new Date(c.capturedAt).toLocaleString(intl.locale)}
-                </span>
-                {c.geo && (c.geo.lat != null) && (
-                  <span className="u-prova-geo">
-                    <IconPin /> {c.geo.lat.toFixed(4)}, {c.geo.lng?.toFixed(4)}
+          {captures.map((c) => {
+            const KindIcon = KIND_ICON[c.kind];
+            return (
+              <Link key={c.id} to={`/prova/${c.id}`} className="u-prova-card" data-kind={c.kind}>
+                <div className="u-prova-thumb">
+                  {c.kind === 'photo' ? (
+                    <AuthedImage src={`/app/v1/captures/${c.id}/media`} alt={c.title} getToken={getUserToken} />
+                  ) : (
+                    <span className="u-prova-kindicon">
+                      <KindIcon />
+                    </span>
+                  )}
+                  <span className="u-prova-badge" data-kind={c.kind}>
+                    <KindIcon /> {intl.formatMessage({ id: `u.kind.${c.kind}` })}
                   </span>
-                )}
-              </div>
-            </Link>
-          ))}
+                </div>
+                <div className="u-prova-meta">
+                  <strong>{c.title || intl.formatMessage({ id: `u.kind.${c.kind}` })}</strong>
+                  <span className="u-prova-date">
+                    <IconClock /> {new Date(c.capturedAt).toLocaleString(intl.locale)}
+                  </span>
+                  {c.geo && (c.geo.lat != null) && (
+                    <span className="u-prova-geo">
+                      <IconPin /> {c.geo.lat.toFixed(4)}, {c.geo.lng?.toFixed(4)}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
