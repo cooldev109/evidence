@@ -51,7 +51,8 @@ export function Capture() {
   const [file, setFile] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [geo, setGeo] = useState<CaptureGeo | null>(null);
-  const [geoState, setGeoState] = useState<'idle' | 'locating' | 'ok' | 'denied'>('idle');
+  const [geoState, setGeoState] = useState<'idle' | 'locating' | 'ok' | 'blocked' | 'unavailable'>('idle');
+  const [geoHelpOpen, setGeoHelpOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<AtaParticipant[]>([{ name: '', email: '' }]);
@@ -64,9 +65,35 @@ export function Capture() {
   const chunksRef = useRef<Blob[]>([]);
 
   // Request geolocation up front so it's embedded in the evidence.
+  // Use the Permissions API where available so we can (a) know if the
+  // permission is already 'denied' and skip a silent failure, and (b) react
+  // instantly when the user toggles the permission in browser site settings.
   useEffect(() => {
-    requestLocation();
+    if (!('geolocation' in navigator)) {
+      setGeoState('blocked');
+      return;
+    }
+    let permStatus: PermissionStatus | undefined;
+    const onChange = () => {
+      if (!permStatus) return;
+      if (permStatus.state === 'granted') requestLocation();
+      else if (permStatus.state === 'denied') setGeoState('blocked');
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' as PermissionName })
+        .then((p) => {
+          permStatus = p;
+          if (p.state === 'denied') setGeoState('blocked');
+          else requestLocation();
+          p.addEventListener?.('change', onChange);
+        })
+        .catch(() => requestLocation());
+    } else {
+      requestLocation();
+    }
     return () => {
+      permStatus?.removeEventListener?.('change', onChange);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,7 +101,7 @@ export function Capture() {
 
   function requestLocation() {
     if (!('geolocation' in navigator)) {
-      setGeoState('denied');
+      setGeoState('blocked');
       return;
     }
     setGeoState('locating');
@@ -86,8 +113,12 @@ export function Capture() {
           accuracy: pos.coords.accuracy,
         });
         setGeoState('ok');
+        setGeoHelpOpen(false);
       },
-      () => setGeoState('denied'),
+      (err) => {
+        // err.code: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+        setGeoState(err.code === 1 ? 'blocked' : 'unavailable');
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
     );
   }
@@ -333,7 +364,17 @@ export function Capture() {
       </label>
 
       {/* Location */}
-      <button className={`u-location u-location-${geoState}`} onClick={requestLocation} type="button">
+      <button
+        className={`u-location u-location-${geoState}`}
+        onClick={() => {
+          if (geoState === 'blocked') {
+            setGeoHelpOpen((o) => !o);
+          } else {
+            requestLocation();
+          }
+        }}
+        type="button"
+      >
         <IconPin />
         {geoState === 'ok' && geo ? (
           <span className="u-location-text">
@@ -347,12 +388,46 @@ export function Capture() {
           </span>
         ) : geoState === 'locating' ? (
           <FormattedMessage id="u.capture.locating" />
-        ) : geoState === 'denied' ? (
-          <FormattedMessage id="u.capture.locationOff" />
+        ) : geoState === 'blocked' ? (
+          <FormattedMessage id="u.capture.locationBlocked" />
+        ) : geoState === 'unavailable' ? (
+          <FormattedMessage id="u.capture.locationUnavailable" />
         ) : (
           <FormattedMessage id="u.capture.location" />
         )}
       </button>
+
+      {/* When location is blocked, show inline help so the user can fix it
+          without restarting the capture. The user can also save without it. */}
+      {geoState === 'blocked' && geoHelpOpen && (
+        <div className="u-location-help" role="dialog" aria-live="polite">
+          <strong>
+            <FormattedMessage id="u.capture.locationBlocked" />
+          </strong>
+          <p>
+            <FormattedMessage id="u.capture.locationBlockedHelp" />
+          </p>
+          <div className="u-location-help-actions">
+            <button
+              type="button"
+              className="u-btn-primary sm"
+              onClick={() => {
+                setGeoHelpOpen(false);
+                requestLocation();
+              }}
+            >
+              <FormattedMessage id="u.capture.tryAgain" />
+            </button>
+            <button
+              type="button"
+              className="link"
+              onClick={() => setGeoHelpOpen(false)}
+            >
+              <FormattedMessage id="u.capture.continueWithout" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && <div className="u-error">{error}</div>}
 

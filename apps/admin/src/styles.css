@@ -578,9 +578,29 @@ button.link.danger:hover:not(:disabled) { background: var(--bad-bg); }
 .u-location-coords { font-size: 12.5px; font-weight: 600; font-feature-settings: "tnum"; opacity: 0.95; }
 .u-location-ok { border-color: var(--u-ok-border); background: var(--u-ok-bg); color: var(--u-ok); font-weight: 700; }
 .u-location-locating { color: var(--u-brand); border-color: var(--u-brand-soft); background: var(--u-brand-soft); }
-.u-location-denied { color: var(--u-text-faint); border-style: dashed; }
+.u-location-blocked,
+.u-location-unavailable { color: var(--u-warn); border-color: #fcd34d; background: #fef3c7; }
+:root[data-theme="dark"] .u-location-blocked,
+:root[data-theme="dark"] .u-location-unavailable { background: rgba(251,191,36,0.14); border-color: rgba(251,191,36,0.45); }
 .u-location:hover:not(:disabled) { background: var(--u-surface-2); }
 .u-location-ok:hover:not(:disabled) { background: var(--u-ok-bg); }
+.u-location-blocked:hover:not(:disabled),
+.u-location-unavailable:hover:not(:disabled) { filter: brightness(0.97); }
+
+/* inline help panel shown when the location pill is tapped while blocked */
+.u-location-help {
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius: 12px;
+  padding: 14px 16px; margin: -8px 0 18px; box-shadow: var(--u-shadow-sm);
+  display: flex; flex-direction: column; gap: 8px;
+  animation: u-help-in 160ms ease-out;
+}
+.u-location-help strong { font-size: 13.5px; font-weight: 800; color: var(--u-text); }
+.u-location-help p { margin: 0; font-size: 13px; color: var(--u-text-muted); line-height: 1.5; }
+.u-location-help-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.u-location-help-actions .link { color: var(--u-brand); font-weight: 700; font-size: 13px; padding: 6px 10px; border-radius: 8px; }
+.u-location-help-actions .link:hover:not(:disabled) { background: var(--u-brand-soft); }
+@keyframes u-help-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
 .u-submit { margin-top: 6px; }
 
 /* ---- prova detail ---- */
