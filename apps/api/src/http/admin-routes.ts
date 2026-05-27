@@ -31,6 +31,7 @@ import {
   AppUserEmailTaken,
 } from '../userapp/repository.js';
 import { listSignersByCapture } from '../userapp/signers.js';
+import { buildCertificate } from '../evidence/build-certificate.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -396,6 +397,25 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AppDeps): 
       reply.header('Content-Type', contentType ?? capture.contentType);
       reply.header('X-Evidence-Sha256', capture.mediaSha256);
       return reply.send(body);
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/admin/v1/captures/:id/certificate.pdf',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const a = req.admin!;
+      const capture = await getCapture(deps.sql, a.tid, req.params.id);
+      if (!capture) {
+        reply.status(404);
+        return { error: 'not_found' };
+      }
+      const pdf = await buildCertificate(deps, capture);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `attachment; filename="evidence-${capture.id}.pdf"`)
+        .header('X-Evidence-Pdf-Sha256', pdf.sha256);
+      return reply.send(pdf.pdf);
     },
   );
 

@@ -151,14 +151,24 @@ export function Captures() {
                 </tr>
               </tbody>
             </table>
-            <AuthedDownloadLink
-              className="link"
-              src={`/admin/v1/captures/${selected.id}/media`}
-              filename={`${selected.id}.${selected.contentType.split('/')[1] ?? 'bin'}`}
-              getToken={getToken}
-            >
-              <FormattedMessage id="u.detail.download" />
-            </AuthedDownloadLink>
+            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+              <AuthedDownloadLink
+                className="link"
+                src={`/admin/v1/captures/${selected.id}/certificate.pdf`}
+                filename={`evidence-${selected.id}.pdf`}
+                getToken={getToken}
+              >
+                <FormattedMessage id="u.detail.downloadCert" />
+              </AuthedDownloadLink>
+              <AuthedDownloadLink
+                className="link"
+                src={`/admin/v1/captures/${selected.id}/media`}
+                filename={`${selected.id}.${selected.contentType.split('/')[1] ?? 'bin'}`}
+                getToken={getToken}
+              >
+                <FormattedMessage id="u.detail.download" />
+              </AuthedDownloadLink>
+            </div>
           </div>
         </div>
       )}

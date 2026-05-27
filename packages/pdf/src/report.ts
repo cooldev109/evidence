@@ -206,3 +206,215 @@ function drawHash(doc: PDFKit.PDFDocument, key: string, value: string): void {
   doc.font('Courier').fontSize(9).text(value, { width: 480 });
   doc.font('Helvetica').fontSize(10);
 }
+
+// ============================================================
+// Per-capture certificate of evidence
+// ============================================================
+
+export type CertificateKind = 'photo' | 'video' | 'audio' | 'ata';
+
+export interface CertificateInput {
+  captureId: string;
+  eventId: string;
+  kind: CertificateKind;
+  title: string;
+  capturedAt: string;
+  capturedByEmail: string;
+  contentType: string;
+  sizeBytes: number;
+  mediaSha256: string;
+  geo: { lat?: number; lng?: number; accuracy?: number; address?: string } | null;
+  event: {
+    seq: number;
+    payloadHash: string;
+    prevHash: string;
+    chainHash: string;
+    createdAt: string;
+  };
+  timestamp: { provider: string; jurisdiction: string; issuedAt: string; digestHex: string } | null;
+  /** Raw bytes of the captured media. Used to embed a thumbnail/preview for photos. */
+  mediaBytes?: Buffer;
+  tenant: ReportTenant;
+  /** Optional — ATA transcript. */
+  transcript?: string | null;
+  /** Optional — ATA signers list. */
+  signers?: { name: string; email: string; signed: boolean; signedAt: string | null }[];
+  locale: Locale | string;
+  /** Public verification base URL, e.g. https://docas.ai/public/verify */
+  verificationUrl: string;
+  generatedAt: string;
+}
+
+export async function renderCertificate(input: CertificateInput): Promise<ReportResult> {
+  const locale = resolveLocale(typeof input.locale === 'string' ? input.locale : 'pt-BR');
+  const m = messages(locale);
+
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: PAGE_MARGINS,
+    bufferPages: true,
+    info: {
+      Title: `${m.certTitle} — ${input.title || input.captureId.slice(0, 8)}`,
+      Author: 'EVIDENCE',
+      Subject: `Capture ${input.captureId}`,
+      Producer: 'EVIDENCE',
+      Creator: 'EVIDENCE',
+      CreationDate: new Date(input.generatedAt),
+      ModDate: new Date(input.generatedAt),
+    },
+  });
+
+  const verificationFullUrl = `${input.verificationUrl}?event=${encodeURIComponent(input.eventId)}`;
+  const qrPng = await QRCode.toBuffer(verificationFullUrl, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 200,
+  });
+
+  const chunks: Buffer[] = [];
+  doc.on('data', (b: Buffer) => chunks.push(b));
+  const done: Promise<Buffer> = new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
+
+  const contentWidth = doc.page.width - PAGE_MARGINS.left - PAGE_MARGINS.right;
+
+  // ---------- Header ----------
+  doc.font('Helvetica-Bold').fontSize(20).text(m.certTitle, { align: 'left' });
+  doc.font('Helvetica').fontSize(10.5).fillColor('#555').text(m.certSubtitle).fillColor('black');
+  doc.moveDown(0.4);
+  doc.font('Helvetica').fontSize(9).fillColor('#777').text(`${input.tenant.name}  ·  ${input.captureId}`).fillColor('black');
+  doc.moveDown(1);
+
+  // ---------- Embedded photo (only for photo captures) ----------
+  if (input.kind === 'photo' && input.mediaBytes) {
+    try {
+      const maxW = contentWidth;
+      const maxH = 280;
+      const startY = doc.y;
+      doc.image(input.mediaBytes, PAGE_MARGINS.left, startY, {
+        fit: [maxW, maxH],
+        align: 'center',
+        valign: 'center',
+      });
+      doc.y = startY + maxH;
+      doc.moveDown(1);
+    } catch {
+      // unreadable image bytes — skip the preview, the metadata still works
+    }
+  }
+
+  // ---------- Evidence metadata ----------
+  doc.font('Helvetica').fontSize(11);
+  const kindLabel =
+    input.kind === 'photo' ? m.certKindPhoto :
+    input.kind === 'video' ? m.certKindVideo :
+    input.kind === 'audio' ? m.certKindAudio : m.certKindAta;
+  drawKV(doc, m.certEvidenceTitle, input.title || '—');
+  drawKV(doc, m.certKind, kindLabel);
+  drawKV(doc, m.certCapturedBy, input.capturedByEmail);
+  drawKV(doc, m.certCapturedAt, input.capturedAt);
+  drawKV(doc, m.certFile, `${input.contentType}  ·  ${m.certBytes(input.sizeBytes)}`);
+  if (input.geo && input.geo.lat != null && input.geo.lng != null) {
+    const accuracy = input.geo.accuracy ? ` (±${Math.round(input.geo.accuracy)}m)` : '';
+    drawKV(doc, m.certLocation, `${input.geo.lat.toFixed(5)}, ${input.geo.lng.toFixed(5)}${accuracy}`);
+  } else {
+    drawKV(doc, m.certLocation, m.certNoLocation);
+  }
+  doc.moveDown(0.8);
+
+  // ---------- Integrity proof ----------
+  doc.font('Helvetica-Bold').fontSize(12).text(m.certIntegrity);
+  doc.moveDown(0.3);
+  doc.font('Helvetica').fontSize(10);
+  drawHash(doc, m.certFileHash, input.mediaSha256);
+  drawHash(doc, m.certChainHash, input.event.chainHash);
+  drawHash(doc, m.certPrevHash, input.event.prevHash);
+  doc.moveDown(0.6);
+
+  // ---------- Timestamp ----------
+  if (input.timestamp) {
+    doc.font('Helvetica-Bold').fontSize(12).text(m.tsaHeading);
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10);
+    drawKV(doc, m.tsaProvider, `${input.timestamp.provider} (${input.timestamp.jurisdiction})`);
+    drawKV(doc, m.tsaIssuedAt, input.timestamp.issuedAt);
+    drawHash(doc, m.tsaDigest, input.timestamp.digestHex);
+    doc.moveDown(0.6);
+  }
+
+  // ---------- ATA transcript + signers (only for ATA captures) ----------
+  if (input.kind === 'ata' && input.transcript) {
+    if (doc.y > doc.page.height - PAGE_MARGINS.bottom - 200) doc.addPage();
+    doc.font('Helvetica-Bold').fontSize(12).text(m.certTranscriptHeading);
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10.5).text(input.transcript, { align: 'left' });
+    doc.moveDown(0.8);
+
+    if (input.signers && input.signers.length > 0) {
+      if (doc.y > doc.page.height - PAGE_MARGINS.bottom - 150) doc.addPage();
+      doc.font('Helvetica-Bold').fontSize(12).text(m.certSignersHeading);
+      doc.moveDown(0.3);
+      doc.font('Helvetica').fontSize(10);
+      for (const s of input.signers) {
+        const status = s.signed ? `✓ ${m.certSigned}` : `… ${m.certPending}`;
+        const who = s.name && s.email ? `${s.name} <${s.email}>` : s.name || s.email || '—';
+        const when = s.signed && s.signedAt ? `  ·  ${s.signedAt}` : '';
+        doc.text(`${status}   ${who}${when}`);
+      }
+      doc.moveDown(0.6);
+    }
+  }
+
+  // ---------- Verification block (QR code + URL) ----------
+  if (doc.y > doc.page.height - PAGE_MARGINS.bottom - 200) doc.addPage();
+  doc.font('Helvetica-Bold').fontSize(12).text(m.certVerifyHeading);
+  doc.moveDown(0.3);
+  const verifyY = doc.y;
+  const qrSize = 110;
+  const qrX = doc.page.width - PAGE_MARGINS.right - qrSize;
+  doc.image(qrPng, qrX, verifyY, { width: qrSize });
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor('#555')
+    .text(m.certScanQr, qrX, verifyY + qrSize + 4, { width: qrSize, align: 'center' })
+    .fillColor('black');
+  // Wrap the body text to the left of the QR
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .text(m.certVerifyBody, PAGE_MARGINS.left, verifyY, { width: contentWidth - qrSize - 16 });
+  doc.moveDown(0.5);
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor('#0066cc')
+    .text(verificationFullUrl, PAGE_MARGINS.left, doc.y, {
+      width: contentWidth - qrSize - 16,
+      link: verificationFullUrl,
+    })
+    .fillColor('black');
+
+  // ---------- Footer ----------
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor('#777')
+      .text(
+        `${m.footerLine}   |   ${m.page(i + 1, range.count)}`,
+        PAGE_MARGINS.left,
+        doc.page.height - PAGE_MARGINS.bottom + 20,
+        { align: 'center', width: contentWidth },
+      )
+      .fillColor('black');
+  }
+
+  doc.end();
+  const pdf = await done;
+  return { pdf, sha256: sha256Hex(pdf), pageCount: range.count };
+}

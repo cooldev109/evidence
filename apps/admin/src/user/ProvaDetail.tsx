@@ -155,14 +155,24 @@ export function ProvaDetail() {
         </div>
       </dl>
 
-      <AuthedDownloadLink
-        src={mediaUrl(capture.id)}
-        filename={`${capture.id}.${capture.contentType.split('/')[1] ?? 'bin'}`}
-        getToken={getUserToken}
-        className="u-btn-ghost u-download"
-      >
-        <FormattedMessage id="u.detail.download" />
-      </AuthedDownloadLink>
+      <div className="u-download-row">
+        <AuthedDownloadLink
+          src={`/app/v1/captures/${capture.id}/certificate.pdf`}
+          filename={`evidence-${capture.id}.pdf`}
+          getToken={getUserToken}
+          className="u-btn-primary u-download"
+        >
+          <FormattedMessage id="u.detail.downloadCert" />
+        </AuthedDownloadLink>
+        <AuthedDownloadLink
+          src={mediaUrl(capture.id)}
+          filename={`${capture.id}.${capture.contentType.split('/')[1] ?? 'bin'}`}
+          getToken={getUserToken}
+          className="u-btn-ghost u-download"
+        >
+          <FormattedMessage id="u.detail.download" />
+        </AuthedDownloadLink>
+      </div>
     </div>
   );
 }

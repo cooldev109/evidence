@@ -19,6 +19,7 @@ import {
   type CaptureGeo,
 } from '../userapp/repository.js';
 import { createAtaSigners, listSignersByCapture, type AtaSigner } from '../userapp/signers.js';
+import { buildCertificate } from '../evidence/build-certificate.js';
 
 /** Public signing link for a participant token. */
 function signUrl(base: string, token: string): string {
@@ -535,6 +536,29 @@ export async function registerUserAppRoutes(app: FastifyInstance, deps: AppDeps)
       reply.header('Content-Type', contentType ?? capture.contentType);
       reply.header('X-Evidence-Sha256', capture.mediaSha256);
       return reply.send(body);
+    },
+  );
+
+  // ---- Evidence certificate (PDF bundling everything needed to verify) ----
+  app.get<{ Params: { id: string } }>(
+    '/app/v1/captures/:id/certificate.pdf',
+    { preHandler: requireUser },
+    async (req, reply) => {
+      const u = req.appUser!;
+      const capture = await getCapture(deps.sql, u.tid, req.params.id);
+      if (!capture || capture.appUserId !== u.sub) {
+        reply.status(404);
+        return { error: 'not_found' };
+      }
+      const pdf = await buildCertificate(deps, capture);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header(
+          'Content-Disposition',
+          `attachment; filename="evidence-${capture.id}.pdf"`,
+        )
+        .header('X-Evidence-Pdf-Sha256', pdf.sha256);
+      return reply.send(pdf.pdf);
     },
   );
 }
