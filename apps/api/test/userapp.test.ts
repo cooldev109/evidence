@@ -295,12 +295,41 @@ describe('End-user capture flow', () => {
     expect(view.json().signed).toBe(false);
     expect(view.json().ata.title).toBe('Assembleia');
 
-    // Public POST records the signature (no auth).
-    const sign = await ctx.app.inject({
+    // The signer has an email on file → the GET view advertises it so the
+    // frontend knows to render the email input.
+    expect(view.json().signer.hasEmailOnFile).toBe(true);
+
+    // Missing email is rejected with a clear 400 (signer has email on file).
+    const noEmail = await ctx.app.inject({
       method: 'POST',
       url: `/public/v1/ata/sign/${token}`,
       headers: { 'content-type': 'application/json' },
       payload: { name: 'Ana Maria' },
+    });
+    expect(noEmail.statusCode).toBe(400);
+    expect(noEmail.json().error).toBe('email_required');
+
+    // Wrong email → 403 email_mismatch.
+    const wrongEmail = await ctx.app.inject({
+      method: 'POST',
+      url: `/public/v1/ata/sign/${token}`,
+      headers: { 'content-type': 'application/json' },
+      payload: { name: 'Ana Maria', email: 'someone-else@x.test' },
+    });
+    expect(wrongEmail.statusCode).toBe(403);
+    expect(wrongEmail.json().error).toBe('email_mismatch');
+
+    // Correct email + name → 200, signature sealed; geo + cpf go into payload.
+    const sign = await ctx.app.inject({
+      method: 'POST',
+      url: `/public/v1/ata/sign/${token}`,
+      headers: { 'content-type': 'application/json' },
+      payload: {
+        name: 'Ana Maria',
+        email: 'Ana@X.Test',  // case-insensitive match against ana@x.test
+        cpf: '123.456.789-09',
+        geo: { lat: -23.55, lng: -46.63, accuracy: 9 },
+      },
     });
     expect(sign.statusCode).toBe(200);
     expect(sign.json().signed).toBe(true);
@@ -311,7 +340,7 @@ describe('End-user capture flow', () => {
       method: 'POST',
       url: `/public/v1/ata/sign/${token}`,
       headers: { 'content-type': 'application/json' },
-      payload: {},
+      payload: { email: 'ana@x.test' },
     });
     expect(again.json().alreadySigned).toBe(true);
 

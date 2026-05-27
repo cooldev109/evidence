@@ -202,7 +202,12 @@ export function mediaUrl(captureId: string): string {
 // ---- Public ATA signing (no authentication) ----
 export interface AtaSignView {
   signed: boolean;
-  signer: { name: string; email: string; signedAt: string | null };
+  signer: {
+    name: string;
+    email: string;
+    signedAt: string | null;
+    hasEmailOnFile: boolean;
+  };
   ata: {
     title: string;
     transcript: string | null;
@@ -218,15 +223,30 @@ export async function getAtaForSigning(token: string): Promise<AtaSignView> {
   return (await res.json()) as AtaSignView;
 }
 
+export interface SignAtaInput {
+  name: string;
+  email?: string;
+  cpf?: string;
+  geo?: CaptureGeo | null;
+}
+
 export async function signAta(
   token: string,
-  name: string,
+  data: SignAtaInput,
 ): Promise<{ signed: boolean; signedAt: string }> {
   const res = await fetch(`/public/v1/ata/sign/${token}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(data),
   });
-  if (!res.ok) throw new ApiError(res.status, null);
+  if (!res.ok) {
+    let parsed: unknown = null;
+    try {
+      parsed = await res.json();
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, parsed);
+  }
   return (await res.json()) as { signed: boolean; signedAt: string };
 }

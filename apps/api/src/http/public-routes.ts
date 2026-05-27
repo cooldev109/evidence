@@ -22,7 +22,20 @@ const VerifyBody = z.object({
     .describe('A canonical evidence envelope (JSON string or object)'),
 });
 
-const SignBody = z.object({ name: z.string().max(200).optional() });
+const SignGeoSchema = z
+  .object({
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    accuracy: z.number().optional(),
+  })
+  .strict()
+  .optional();
+const SignBody = z.object({
+  name: z.string().max(200).optional(),
+  email: z.string().email().max(320).optional(),
+  cpf: z.string().max(20).optional(),
+  geo: SignGeoSchema,
+});
 
 interface EvidenceRow {
   tenant_id: string;
@@ -286,7 +299,16 @@ export async function registerPublicRoutes(
         const tenant = await getTenantSettings(deps.sql, signer.tenantId);
         return {
           signed: !!signer.signedAt,
-          signer: { name: signer.name, email: signer.email, signedAt: signer.signedAt },
+          signer: {
+            name: signer.name,
+            email: signer.email,
+            signedAt: signer.signedAt,
+            // Tell the frontend whether an email-match is required for this
+            // signer (i.e. whether the owner provided an email when creating
+            // the ATA). If yes, the signing page asks for the email and the
+            // server below verifies it.
+            hasEmailOnFile: !!(signer.email && signer.email.trim()),
+          },
           ata: capture
             ? {
                 title: capture.title,
@@ -325,6 +347,30 @@ export async function registerPublicRoutes(
           return { signed: true, signedAt: signer.signedAt, alreadySigned: true };
         }
 
+        // Identity check: if the owner provided an email for this signer when
+        // creating the ATA, the typed email must match it (case-insensitive).
+        // This raises the bar from "anyone with the link can sign" to "anyone
+        // with the link AND who knows the participant's email can sign". The
+        // chain + RFC-3161 timestamp seal the result.
+        const storedEmail = (signer.email ?? '').trim().toLowerCase();
+        const typedEmail = (parsed.data.email ?? '').trim().toLowerCase();
+        if (storedEmail) {
+          if (!typedEmail) {
+            reply.status(400);
+            return {
+              error: 'email_required',
+              detail: 'Please provide your email to sign this document.',
+            };
+          }
+          if (typedEmail !== storedEmail) {
+            reply.status(403);
+            return {
+              error: 'email_mismatch',
+              detail: 'The email you provided does not match the one registered for this signature.',
+            };
+          }
+        }
+
         const ataEvent = await getEventById(deps.sql, signer.tenantId, signer.eventId);
         if (!ataEvent) {
           reply.status(404);
@@ -333,6 +379,9 @@ export async function registerPublicRoutes(
         const tenant = await getTenantSettings(deps.sql, signer.tenantId);
         const signedAt = new Date().toISOString();
         const signerName = (parsed.data.name ?? signer.name ?? '').slice(0, 200);
+        const cpfDigits = parsed.data.cpf
+          ? parsed.data.cpf.replace(/\D/g, '').slice(0, 14) || null
+          : null;
 
         // Seal the signature as its own chained event bound to the ATA's hash.
         const payload = {
@@ -344,6 +393,12 @@ export async function registerPublicRoutes(
           signerId: signer.id,
           signerName,
           signerEmail: signer.email,
+          /** Email actually typed at signing time (verified to match stored). */
+          confirmedEmail: parsed.data.email ?? null,
+          /** Optional CPF the signer chose to disclose for the audit trail. */
+          signerCpf: cpfDigits,
+          /** Geolocation the signer's browser reported (if they consented). */
+          signerGeo: parsed.data.geo ?? null,
           signedAt,
           ip: req.ip,
           userAgent: String(req.headers['user-agent'] ?? '').slice(0, 400),

@@ -269,10 +269,13 @@ export async function renderCertificate(input: CertificateInput): Promise<Report
   });
 
   const verificationFullUrl = `${input.verificationUrl}?event=${encodeURIComponent(input.eventId)}`;
+  // Use a generous quiet zone (margin: 4 is the spec-recommended minimum) and
+  // higher error correction so phone cameras don't drop characters on dense
+  // 60+ char URLs. Larger PNG output = sharper print rendering.
   const qrPng = await QRCode.toBuffer(verificationFullUrl, {
-    errorCorrectionLevel: 'M',
-    margin: 1,
-    width: 200,
+    errorCorrectionLevel: 'Q',
+    margin: 4,
+    width: 480,
   });
 
   const chunks: Buffer[] = [];
@@ -373,16 +376,16 @@ export async function renderCertificate(input: CertificateInput): Promise<Report
 
   // ---------- Original file (share URL + small QR) ----------
   if (input.fileShareUrl) {
-    if (doc.y > doc.page.height - PAGE_MARGINS.bottom - 170) doc.addPage();
+    if (doc.y > doc.page.height - PAGE_MARGINS.bottom - 200) doc.addPage();
     const fileQr = await QRCode.toBuffer(input.fileShareUrl, {
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 200,
+      errorCorrectionLevel: 'Q',
+      margin: 4,
+      width: 480,
     });
     doc.font('Helvetica-Bold').fontSize(12).text(m.certFileHeading);
     doc.moveDown(0.3);
     const fileY = doc.y;
-    const fileQrSize = 90;
+    const fileQrSize = 120;
     const fileQrX = doc.page.width - PAGE_MARGINS.right - fileQrSize;
     doc.image(fileQr, fileQrX, fileY, { width: fileQrSize });
     doc
@@ -394,15 +397,22 @@ export async function renderCertificate(input: CertificateInput): Promise<Report
     doc.moveDown(0.4);
     doc
       .font('Helvetica-Bold')
-      .fontSize(10.5)
+      .fontSize(10)
+      .text(`${m.certOpenFile}:`, PAGE_MARGINS.left, doc.y, {
+        width: contentWidth - fileQrSize - 16,
+      });
+    // Render the URL on its OWN line, in a smaller monospace font, so it
+    // never wraps mid-string or visually overlaps the QR.
+    doc
+      .font('Courier')
+      .fontSize(8.5)
       .fillColor('#0066cc')
-      .text(`${m.certOpenFile}: `, PAGE_MARGINS.left, doc.y, { continued: true })
-      .font('Helvetica')
       .text(input.fileShareUrl, {
         width: contentWidth - fileQrSize - 16,
         link: input.fileShareUrl,
       })
-      .fillColor('black');
+      .fillColor('black')
+      .font('Helvetica');
     // Reserve vertical room for the QR if the text was shorter than the QR.
     if (doc.y < fileY + fileQrSize) doc.y = fileY + fileQrSize;
     doc.moveDown(0.8);
