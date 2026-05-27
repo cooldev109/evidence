@@ -89,6 +89,7 @@ export async function buildCertificate(
     signers,
     locale: tenant?.locale ?? 'pt-BR',
     verificationUrl: `${deps.config.PUBLIC_BASE_URL.replace(/\/$/, '')}/public/verify`,
+    fileShareUrl: `${deps.config.PUBLIC_BASE_URL.replace(/\/$/, '')}/public/v1/share/${capture.shareToken}`,
     generatedAt: new Date().toISOString(),
   });
 }

@@ -11,7 +11,7 @@ import {
   appendEvent,
   getEventById,
 } from '../events/repository.js';
-import { getCapture } from '../userapp/repository.js';
+import { getCapture, findCaptureByShareToken } from '../userapp/repository.js';
 import { getTenantSettings } from '../admin/repository.js';
 import { findSignerByToken, markSignerSigned } from '../userapp/signers.js';
 import { computeRetainUntil } from '../evidence/bootstrap.js';
@@ -224,6 +224,48 @@ export async function registerPublicRoutes(
           return { error: 'not_found' };
         }
         return result;
+      },
+    );
+
+    // ---- Public media share (token-gated, no auth) ----
+    // The PDF certificate of a capture embeds /public/v1/share/<token> as a
+    // clickable link + QR code, so a recipient who only has the certificate
+    // (e.g. a lawyer) can fetch the original media and verify it against the
+    // SHA-256 printed in the PDF. The token is 24 random bytes — possession
+    // of the certificate = possession of the share token.
+    scope.get<{ Params: { token: string } }>(
+      '/public/v1/share/:token',
+      { schema: { tags: ['public'], summary: 'Fetch the original media file by share token' } },
+      async (req, reply) => {
+        const capture = await findCaptureByShareToken(deps.sql, req.params.token);
+        if (!capture) {
+          reply.status(404);
+          return { error: 'not_found' };
+        }
+        const { body, contentType } = await deps.persistence.getMedia(capture.objectKey);
+        const extMap: Record<string, string> = {
+          'image/jpeg': 'jpg',
+          'image/png': 'png',
+          'image/webp': 'webp',
+          'image/heic': 'heic',
+          'video/mp4': 'mp4',
+          'video/webm': 'webm',
+          'video/quicktime': 'mov',
+          'audio/mp4': 'm4a',
+          'audio/webm': 'webm',
+          'audio/wav': 'wav',
+          'audio/mpeg': 'mp3',
+          'audio/ogg': 'ogg',
+        };
+        const baseType = (capture.contentType.split(';')[0] || '').trim().toLowerCase();
+        const ext = extMap[baseType] ?? 'bin';
+        reply.header('Content-Type', contentType ?? capture.contentType);
+        reply.header('X-Evidence-Sha256', capture.mediaSha256);
+        reply.header(
+          'Content-Disposition',
+          `attachment; filename="evidence-${capture.id}.${ext}"`,
+        );
+        return reply.send(body);
       },
     );
 

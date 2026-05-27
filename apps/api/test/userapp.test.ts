@@ -324,6 +324,39 @@ describe('End-user capture flow', () => {
     expect(verify.result.ok).toBe(true);
   });
 
+  it('exposes the captured media via /public/v1/share/<token> with the right SHA-256', async () => {
+    const { adminEmail } = await seedTenantWithAdmin('shr');
+    const adminToken = (await adminLogin(adminEmail)).json().token;
+    await registerUser(adminToken, 'shr@ua.test');
+    const userToken = (await userLogin('shr@ua.test')).json().token;
+
+    const fileBytes = Buffer.from('public-share-test');
+    const expectedSha = createHash('sha256').update(fileBytes).digest('hex');
+    const mp = multipart(
+      { kind: 'photo' },
+      { name: 'file', filename: 'p.jpg', contentType: 'image/jpeg', body: fileBytes },
+    );
+    const up = await ctx.app.inject({
+      method: 'POST',
+      url: '/app/v1/captures',
+      headers: { authorization: `Bearer ${userToken}`, ...mp.headers },
+      payload: mp.payload,
+    });
+    expect(up.statusCode).toBe(201);
+    const shareToken = up.json().capture.shareToken;
+    expect(shareToken).toBeTruthy();
+
+    // Unauthenticated GET via the share token returns the bytes.
+    const dl = await ctx.app.inject({ method: 'GET', url: `/public/v1/share/${shareToken}` });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.headers['x-evidence-sha256']).toBe(expectedSha);
+    expect(Buffer.from(dl.rawPayload).equals(fileBytes)).toBe(true);
+
+    // Unknown token → 404.
+    const nf = await ctx.app.inject({ method: 'GET', url: '/public/v1/share/totally_fake_token' });
+    expect(nf.statusCode).toBe(404);
+  });
+
   it('isolates one tenant capture from another admin', async () => {
     const a = await seedTenantWithAdmin('ten-a');
     const b = await seedTenantWithAdmin('ten-b');

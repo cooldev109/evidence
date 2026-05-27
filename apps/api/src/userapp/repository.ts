@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { PgClient } from '../db/client.js';
 import { withTenant } from '../db/tenant-context.js';
 import { hashPassword } from '../auth/password.js';
@@ -148,6 +149,7 @@ export interface Capture {
   capturedAt: string;
   createdAt: string;
   transcript: string | null;
+  shareToken: string;
 }
 
 interface CaptureRow {
@@ -166,6 +168,7 @@ interface CaptureRow {
   captured_at: string;
   created_at: string;
   transcript: string | null;
+  share_token: string;
 }
 
 function rowToCapture(r: CaptureRow): Capture {
@@ -185,7 +188,24 @@ function rowToCapture(r: CaptureRow): Capture {
     capturedAt: r.captured_at,
     createdAt: r.created_at,
     transcript: r.transcript ?? null,
+    shareToken: r.share_token,
   };
+}
+
+/** 24 random bytes, base64url — same shape as the ATA signing token. */
+export function newShareToken(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+/** Public lookup by share token — no tenant context (recipient is anonymous). */
+export async function findCaptureByShareToken(
+  sql: PgClient,
+  token: string,
+): Promise<Capture | null> {
+  const rows = await sql<CaptureRow[]>`
+    SELECT * FROM captures WHERE share_token = ${token} LIMIT 1
+  `;
+  return rows.length === 0 ? null : rowToCapture(rows[0]);
 }
 
 export async function recordCapture(
@@ -208,16 +228,19 @@ export async function recordCapture(
 ): Promise<Capture> {
   const now = new Date().toISOString();
   const geoJson = input.geo === null ? null : JSON.stringify(input.geo);
+  const shareToken = newShareToken();
   return withTenant(sql, input.tenantId, async (tx) => {
     const rows = await tx<CaptureRow[]>`
       INSERT INTO captures (
         tenant_id, app_user_id, event_id, kind, title, content_type,
-        size_bytes, media_sha256, store, object_key, geo, captured_at, created_at, transcript
+        size_bytes, media_sha256, store, object_key, geo, captured_at, created_at, transcript,
+        share_token
       ) VALUES (
         ${input.tenantId}, ${input.appUserId}, ${input.eventId}, ${input.kind},
         ${input.title}, ${input.contentType}, ${input.sizeBytes}, ${input.mediaSha256},
         ${input.store}, ${input.objectKey}, ${geoJson}::jsonb, ${input.capturedAt}, ${now},
-        ${input.transcript ?? null}
+        ${input.transcript ?? null},
+        ${shareToken}
       )
       RETURNING *
     `;

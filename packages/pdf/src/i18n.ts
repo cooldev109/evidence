@@ -74,6 +74,9 @@ interface MessageCatalog {
   certVerifyHeading: string;
   certVerifyBody: string;
   certScanQr: string;
+  certFileHeading: string;
+  certFileBody: string;
+  certOpenFile: string;
 }
 
 const PT_BR: MessageCatalog = {
@@ -137,6 +140,10 @@ const PT_BR: MessageCatalog = {
   certVerifyBody:
     'Qualquer pessoa pode verificar a autenticidade deste documento e da prova associada acessando o endereço abaixo ou escaneando o QR code. A verificação recalcula o hash do arquivo, o hash da cadeia e a assinatura do carimbo de tempo de forma independente.',
   certScanQr: 'Escaneie para verificar',
+  certFileHeading: 'Arquivo da prova',
+  certFileBody:
+    'Abra o link abaixo (ou escaneie o QR code) para acessar o arquivo original. Confira o SHA-256 do arquivo baixado com o hash impresso acima — se forem iguais, o arquivo é autêntico.',
+  certOpenFile: 'Abrir arquivo',
 };
 
 const EN_US: MessageCatalog = {
@@ -200,6 +207,10 @@ const EN_US: MessageCatalog = {
   certVerifyBody:
     'Anyone can independently verify the authenticity of this document and its evidence by visiting the URL below or scanning the QR code. Verification recomputes the file hash, the chain hash, and the timestamp signature independently.',
   certScanQr: 'Scan to verify',
+  certFileHeading: 'Original evidence file',
+  certFileBody:
+    'Open the link below (or scan the QR code) to access the original file. Compare the SHA-256 of the downloaded file against the hash printed above — if they match, the file is authentic.',
+  certOpenFile: 'Open file',
 };
 
 const ES_ES: MessageCatalog = {
@@ -263,6 +274,10 @@ const ES_ES: MessageCatalog = {
   certVerifyBody:
     'Cualquier persona puede verificar de forma independiente la autenticidad de este documento y de la prueba asociada visitando la URL siguiente o escaneando el código QR. La verificación recalcula el hash del archivo, el hash de la cadena y la firma del sello de tiempo de forma independiente.',
   certScanQr: 'Escanee para verificar',
+  certFileHeading: 'Archivo de la prueba',
+  certFileBody:
+    'Abra el enlace a continuación (o escanee el código QR) para acceder al archivo original. Compare el SHA-256 del archivo descargado con el hash impreso arriba — si coinciden, el archivo es auténtico.',
+  certOpenFile: 'Abrir archivo',
 };
 
 const CATALOGS: Record<Locale, MessageCatalog> = {

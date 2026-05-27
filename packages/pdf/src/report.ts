@@ -242,6 +242,10 @@ export interface CertificateInput {
   locale: Locale | string;
   /** Public verification base URL, e.g. https://docas.ai/public/verify */
   verificationUrl: string;
+  /** Public, token-gated URL to fetch the original media file (optional;
+   *  when present, the certificate prints it + a QR code so a recipient can
+   *  open the file directly from the PDF). */
+  fileShareUrl?: string;
   generatedAt: string;
 }
 
@@ -365,6 +369,43 @@ export async function renderCertificate(input: CertificateInput): Promise<Report
       }
       doc.moveDown(0.6);
     }
+  }
+
+  // ---------- Original file (share URL + small QR) ----------
+  if (input.fileShareUrl) {
+    if (doc.y > doc.page.height - PAGE_MARGINS.bottom - 170) doc.addPage();
+    const fileQr = await QRCode.toBuffer(input.fileShareUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 200,
+    });
+    doc.font('Helvetica-Bold').fontSize(12).text(m.certFileHeading);
+    doc.moveDown(0.3);
+    const fileY = doc.y;
+    const fileQrSize = 90;
+    const fileQrX = doc.page.width - PAGE_MARGINS.right - fileQrSize;
+    doc.image(fileQr, fileQrX, fileY, { width: fileQrSize });
+    doc
+      .font('Helvetica')
+      .fontSize(10)
+      .text(m.certFileBody, PAGE_MARGINS.left, fileY, {
+        width: contentWidth - fileQrSize - 16,
+      });
+    doc.moveDown(0.4);
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(10.5)
+      .fillColor('#0066cc')
+      .text(`${m.certOpenFile}: `, PAGE_MARGINS.left, doc.y, { continued: true })
+      .font('Helvetica')
+      .text(input.fileShareUrl, {
+        width: contentWidth - fileQrSize - 16,
+        link: input.fileShareUrl,
+      })
+      .fillColor('black');
+    // Reserve vertical room for the QR if the text was shorter than the QR.
+    if (doc.y < fileY + fileQrSize) doc.y = fileY + fileQrSize;
+    doc.moveDown(0.8);
   }
 
   // ---------- Verification block (QR code + URL) ----------
