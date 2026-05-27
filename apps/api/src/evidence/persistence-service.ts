@@ -1,6 +1,8 @@
 import { hashPayload } from '@evidence/core';
 import type { EvidenceStore, RetainMode } from '@evidence/storage';
 import {
+  MockTSAProvider,
+  TSAError,
   localeToJurisdiction,
   pickProvider,
   type TSARegistry,
@@ -63,7 +65,29 @@ export class EvidencePersistenceService {
       );
     }
 
-    const token = await provider.requestToken(event.payloadHash);
+    // Request a timestamp. If the primary TSA is unreachable (e.g. FreeTSA is
+    // down, or the VPS can't egress for a moment), fall back to the local
+    // MockTSAProvider so the capture still completes. The chain integrity
+    // doesn't depend on the TSA — only the legal weight of "this existed by
+    // this wall-clock moment" does. Fallback timestamps are tagged with
+    // provider='mock-fallback' so admin / re-timestamping tools can find them.
+    let token;
+    let timestampJurisdiction = localeToJurisdiction(tenantLocale);
+    try {
+      token = await provider.requestToken(event.payloadHash);
+    } catch (err) {
+      if (err instanceof TSAError) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[persistence] primary TSA '${provider.id}' failed (${err.code}: ${err.message}); using mock-fallback`,
+        );
+        const fallback = await new MockTSAProvider().requestToken(event.payloadHash);
+        token = { ...fallback, provider: 'mock-fallback' as const };
+        timestampJurisdiction = 'DEV';
+      } else {
+        throw err;
+      }
+    }
 
     const envelope = buildEnvelope({
       event,
@@ -71,7 +95,7 @@ export class EvidencePersistenceService {
       timestamps: [
         {
           provider: token.provider,
-          jurisdiction: localeToJurisdiction(tenantLocale),
+          jurisdiction: timestampJurisdiction,
           issuedAt: token.issuedAt,
           digestHex: token.digestHex,
           tokenBase64: token.token.toString('base64'),
@@ -97,7 +121,7 @@ export class EvidencePersistenceService {
           issued_at, digest_hex, created_at
         ) VALUES (
           ${event.id}, ${tenantId}, ${token.provider},
-          ${localeToJurisdiction(tenantLocale)},
+          ${timestampJurisdiction},
           ${token.token},
           ${token.issuedAt}, ${token.digestHex}, ${now}
         )

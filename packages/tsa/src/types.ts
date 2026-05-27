@@ -8,6 +8,7 @@
 
 export type ProviderId =
   | 'mock'
+  | 'mock-fallback'
   | 'freetsa'
   | 'icp-brasil'
   | 'eidas'
