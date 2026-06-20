@@ -19,12 +19,14 @@ import { registerSpa } from './http/spa-plugin.js';
 import { buildStore, buildTSARegistry } from './evidence/bootstrap.js';
 import { EvidencePersistenceService } from './evidence/persistence-service.js';
 import { buildTranscriber, type Transcriber } from './transcription/index.js';
+import { buildCtiClient, type CtiClient } from './cti/index.js';
 
 export interface AppDeps {
   config: AppConfig;
   sql: PgClient;
   persistence: EvidencePersistenceService;
   transcriber: Transcriber;
+  cti: CtiClient;
 }
 
 export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
@@ -82,9 +84,10 @@ async function main(): Promise<void> {
   const { sql } = createDb({ url: config.DATABASE_URL });
   const store = buildStore(config);
   const tsaRegistry = buildTSARegistry(config);
-  const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry });
+  const cti = buildCtiClient(config, sql);
+  const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry, cti });
   const transcriber = buildTranscriber(config);
-  const app = await buildServer({ config, sql, persistence, transcriber });
+  const app = await buildServer({ config, sql, persistence, transcriber, cti });
   try {
     await app.listen({ host: config.API_HOST, port: config.API_PORT });
   } catch (err) {

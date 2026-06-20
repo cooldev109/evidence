@@ -140,14 +140,20 @@ export interface TenantSettings {
   slug: string;
   name: string;
   locale: string;
+  /** Brazilian company id used as the routing key for CTI Trust Hub reports.
+   *  Stored as typed (may be formatted); normalized to 14 digits at CTI-send
+   *  time. null = the admin hasn't set it yet. */
+  cnpj: string | null;
 }
 
 export async function getTenantSettings(
   sql: PgClient,
   tenantId: string,
 ): Promise<TenantSettings | null> {
-  const rows = await sql<{ slug: string; name: string; locale: string }[]>`
-    SELECT slug, name, locale FROM tenants WHERE id = ${tenantId} LIMIT 1
+  const rows = await sql<
+    { slug: string; name: string; locale: string; cnpj: string | null }[]
+  >`
+    SELECT slug, name, locale, cnpj FROM tenants WHERE id = ${tenantId} LIMIT 1
   `;
   return rows.length === 0 ? null : rows[0];
 }
@@ -158,4 +164,12 @@ export async function updateTenantLocale(
   locale: string,
 ): Promise<void> {
   await sql`UPDATE tenants SET locale = ${locale} WHERE id = ${tenantId}`;
+}
+
+export async function updateTenantCnpj(
+  sql: PgClient,
+  tenantId: string,
+  cnpj: string | null,
+): Promise<void> {
+  await sql`UPDATE tenants SET cnpj = ${cnpj} WHERE id = ${tenantId}`;
 }

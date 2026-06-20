@@ -30,6 +30,15 @@ const EnvSchema = z.object({
   TRANSCRIPTION_MODEL: z.string().default('whisper-1'),
   OPENAI_API_KEY: z.string().optional(),
 
+  // ---- CTI Trust Hub integration ----
+  // EVIDENCE pushes findings (TSA fallback, chain tampering, etc.) to the
+  // CTI Trust Hub via signed HMAC-SHA256 requests. All four values are
+  // optional; if any is missing, a NoopCtiClient is used (logs only).
+  CTI_BASE_URL: z.string().url().optional(),
+  CTI_CLIENT_ID: z.string().optional(),
+  CTI_API_KEY: z.string().optional(),
+  CTI_HMAC_SECRET: z.string().optional(),
+
   // Public site (used by the PDF report's QR code + verification page)
   PUBLIC_BASE_URL: z.string().default('http://docas.ai'),
 

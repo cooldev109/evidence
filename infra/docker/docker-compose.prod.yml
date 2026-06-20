@@ -69,6 +69,12 @@ services:
       TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-openai}
       TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-whisper-1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # CTI Trust Hub — all four are optional. If any is missing the API uses
+      # a NoopCtiClient (logs only) so dev/staging keep working without creds.
+      CTI_BASE_URL: ${CTI_BASE_URL:-}
+      CTI_CLIENT_ID: ${CTI_CLIENT_ID:-}
+      CTI_API_KEY: ${CTI_API_KEY:-}
+      CTI_HMAC_SECRET: ${CTI_HMAC_SECRET:-}
       PUBLIC_RATE_LIMIT_MAX: ${PUBLIC_RATE_LIMIT_MAX:-60}
       PUBLIC_RATE_LIMIT_WINDOW: ${PUBLIC_RATE_LIMIT_WINDOW:-1 minute}
     volumes:

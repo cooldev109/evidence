@@ -11,6 +11,7 @@ import type { PgClient } from '../db/client.js';
 import { withTenant } from '../db/tenant-context.js';
 import type { AppendedEvent } from '../events/repository.js';
 import { buildEnvelope } from './envelope.js';
+import type { CtiClient } from '../cti/index.js';
 
 export interface PersistOptions {
   tenantId: string;
@@ -26,6 +27,10 @@ export interface PersistenceServiceDeps {
   sql: PgClient;
   store: EvidenceStore;
   tsaRegistry: TSARegistry;
+  /** Optional CTI emitter — when TSA primary fails and mock-fallback fires,
+   *  we push an 'ancoragem_falha' finding so the customer's CTI dashboard
+   *  surfaces the anchoring failure. NoopCtiClient is fine in dev/test. */
+  cti?: CtiClient;
 }
 
 export interface PersistResult {
@@ -84,6 +89,36 @@ export class EvidencePersistenceService {
         const fallback = await new MockTSAProvider().requestToken(event.payloadHash);
         token = { ...fallback, provider: 'mock-fallback' as const };
         timestampJurisdiction = 'DEV';
+        // Fire-and-forget CTI notification — the save flow continues either
+        // way. CTI failures are logged inside the client; we never re-throw.
+        if (this.deps.cti) {
+          void this.deps.cti
+            .report({
+              tenantId,
+              externalId: event.id,
+              type: 'ancoragem_falha',
+              title: 'Falha de ancoragem em prova (hash/timestamp)',
+              description:
+                `Provedor primário '${provider.id}' falhou ao emitir o carimbo ` +
+                `RFC 3161 (${err.code}: ${err.message}); foi aplicado o fallback ` +
+                `'mock-fallback'.`,
+              priority: 4,
+              recommendedAction: 'Reprocessar e re-ancorar a prova',
+              assetRef: `event:${event.id}`,
+              payload: {
+                event_id: event.id,
+                chain_seq: event.seq,
+                primary_provider: provider.id,
+                error_code: err.code,
+                error_message: err.message.slice(0, 1000),
+                payload_hash: event.payloadHash,
+                tenant_locale: tenantLocale,
+              },
+            })
+            // .report() already swallows network/non-2xx errors; this catch
+            // is just a belt-and-suspenders against an unexpected throw.
+            .catch(() => {});
+        }
       } else {
         throw err;
       }

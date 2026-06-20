@@ -71,8 +71,8 @@ export const api = {
     request<{ id: string; key: string }>('POST', '/admin/v1/api-keys', { label }),
   revokeKey: (id: string) => request<{ revoked: boolean }>('DELETE', `/admin/v1/api-keys/${id}`),
   settings: () => request<{ tenant: Tenant; supportedLocales: string[] }>('GET', '/admin/v1/settings'),
-  saveSettings: (locale: string) =>
-    request<{ tenant: Tenant }>('PATCH', '/admin/v1/settings', { locale }),
+  saveSettings: (patch: { locale?: string; cnpj?: string | null }) =>
+    request<{ tenant: Tenant }>('PATCH', '/admin/v1/settings', patch),
   audit: () => request<{ events: AuditRow[] }>('GET', '/admin/v1/audit'),
   users: () => request<{ users: AppUserRow[] }>('GET', '/admin/v1/users'),
   createUser: (email: string, password: string, name: string) =>
@@ -113,6 +113,7 @@ export interface Tenant {
   slug: string;
   name: string;
   locale: string;
+  cnpj: string | null;
 }
 export interface Overview {
   tenant: Tenant;

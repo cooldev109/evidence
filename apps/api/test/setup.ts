@@ -10,6 +10,7 @@ import { LocalFilesystemStore } from '@evidence/storage';
 import { MockTSAProvider, buildRegistry } from '@evidence/tsa';
 import { EvidencePersistenceService } from '../src/evidence/persistence-service.js';
 import { MockTranscriber } from '../src/transcription/index.js';
+import { NoopCtiClient } from '../src/cti/index.js';
 import type { FastifyInstance } from 'fastify';
 
 export const TEST_DATABASE_URL =
@@ -52,8 +53,17 @@ export async function setupTestContext(): Promise<TestContext> {
     EU: 'mock',
     US: 'mock',
   });
-  const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry });
-  const app = await buildServer({ config, sql, persistence, transcriber: new MockTranscriber() });
+  const cti = new NoopCtiClient({
+    info: () => {}, warn: () => {}, error: () => {},
+  });
+  const persistence = new EvidencePersistenceService({ sql, store, tsaRegistry, cti });
+  const app = await buildServer({
+    config,
+    sql,
+    persistence,
+    transcriber: new MockTranscriber(),
+    cti,
+  });
   await app.ready();
   return {
     app,

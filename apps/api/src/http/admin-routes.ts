@@ -14,6 +14,7 @@ import {
   revokeApiKey,
   getTenantSettings,
   updateTenantLocale,
+  updateTenantCnpj,
 } from '../admin/repository.js';
 import {
   listEvents,
@@ -50,7 +51,21 @@ const ReportBody = z.object({
   toSeq: z.coerce.number().int().min(1).optional(),
   locale: z.string().optional(),
 });
-const SettingsBody = z.object({ locale: z.enum(['pt-BR', 'en-US', 'es-ES']) });
+const SettingsBody = z.object({
+  locale: z.enum(['pt-BR', 'en-US', 'es-ES']).optional(),
+  // CNPJ — accept whatever the admin types (formatted or plain); we normalize
+  // to 14 digits at CTI-send time and reject only if it can't possibly be
+  // valid (i.e. doesn't contain exactly 14 digits after stripping).
+  cnpj: z
+    .string()
+    .max(32)
+    .nullable()
+    .optional()
+    .refine(
+      (v) => v == null || v === '' || (v.replace(/\D/g, '').length === 14),
+      { message: 'CNPJ must contain exactly 14 digits' },
+    ),
+});
 const CreateUserBody = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(256),
@@ -262,16 +277,28 @@ export async function registerAdminRoutes(app: FastifyInstance, deps: AppDeps): 
     const parsed = SettingsBody.safeParse(req.body);
     if (!parsed.success) {
       reply.status(400);
-      return { error: 'invalid_body' };
+      return { error: 'invalid_body', detail: parsed.error.flatten() };
     }
     const a = req.admin!;
-    await updateTenantLocale(deps.sql, a.tid, parsed.data.locale);
-    await recordAudit(deps.sql, {
-      tenantId: a.tid,
-      actorEmail: a.email,
-      action: 'settings.update',
-      detail: { locale: parsed.data.locale },
-    });
+    const updates: Record<string, unknown> = {};
+    if (parsed.data.locale !== undefined) {
+      await updateTenantLocale(deps.sql, a.tid, parsed.data.locale);
+      updates.locale = parsed.data.locale;
+    }
+    if (parsed.data.cnpj !== undefined) {
+      // Store as typed (may be formatted). Empty string → null.
+      const cnpj = parsed.data.cnpj === '' ? null : parsed.data.cnpj;
+      await updateTenantCnpj(deps.sql, a.tid, cnpj);
+      updates.cnpj = cnpj;
+    }
+    if (Object.keys(updates).length > 0) {
+      await recordAudit(deps.sql, {
+        tenantId: a.tid,
+        actorEmail: a.email,
+        action: 'settings.update',
+        detail: updates,
+      });
+    }
     return { tenant: await getTenantSettings(deps.sql, a.tid) };
   });
 
